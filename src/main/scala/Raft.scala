@@ -41,7 +41,7 @@ object Raft {
             timer.cancelAll()
             timer.startSingleTimer("", LeaderTimeout, 2.seconds)
             Actor.same
-          case VoteRequest(candidate, newTerm) if newTerm == currentTerm && votedFor != Some(candidate) =>
+          case VoteRequest(candidate, `currentTerm`) if votedFor != Some(candidate) =>
             Actor.same
           case VoteRequest(_, oldTerm) if oldTerm < currentTerm =>
             Actor.same
@@ -63,13 +63,13 @@ object Raft {
 
     def waitingCandidate(votes: Int): Behavior[Message] = Actor.immutable { (ctx, msg) =>
       msg match {
-        case VoteResponse(oldTerm) if oldTerm < currentTerm =>
-          Actor.same
-        case VoteResponse(term) if (term == currentTerm) && (votes + 1) > (nodes.size / 2) =>
-          nodes.foreach(_ ! Heartbeat(term))
+        case VoteResponse(`currentTerm`) if (votes + 1) > (nodes.size / 2) =>
+          nodes.foreach(_ ! Heartbeat(currentTerm))
           leader(nodes, currentTerm)
-        case VoteResponse(term) =>
+        case VoteResponse(`currentTerm`) =>
           waitingCandidate(votes + 1)
+        case VoteResponse(_) =>
+          Actor.same
         case CandidateTimeout =>
           println(ctx.self + " candidate timeout, start new term")
           candidate(nodes, currentTerm + 1)

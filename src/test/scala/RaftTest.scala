@@ -119,7 +119,7 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
     }
   }
 
-  it should "not confuse vote response from different terms" in cluster { implicit ctx =>
+  it should "not confuse vote responses from different terms" in cluster { implicit ctx =>
     val follower = fiveProbes
     val followerActors = follower.map(_.testActor)
     val candidate = ctx.spawn(Raft.candidate(followerActors, 4), "candidate")
@@ -127,6 +127,10 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
     candidate ! Raft.VoteResponse(1)
     candidate ! Raft.VoteResponse(2)
     candidate ! Raft.VoteResponse(3)
+    candidate ! Raft.VoteResponse(5)
+    candidate ! Raft.VoteResponse(6)
+    candidate ! Raft.VoteResponse(7)
+    candidate ! Raft.VoteResponse(7)
     candidate ! Raft.VoteResponse(4)
 
     follower.foreach { f =>
