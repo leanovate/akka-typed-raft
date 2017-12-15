@@ -72,9 +72,23 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
     val node = TestProbe[Raft.Message]("node")
     val follower = ctx.spawn(Raft.follower(Set(node.testActor), 1, None), "follower")
 
-    follower ! Raft.LeaderTimeout
+    node.expectMsg(500.milliseconds, Raft.VoteRequest(follower, term = 2))
+  }
 
-    node.expectMsg(Raft.VoteRequest(follower, term = 2))
+  it should "ignore heartbeats from previous leaders" in cluster { implicit ctx =>
+    val node = TestProbe[Raft.Message]("node")
+    val follower = ctx.spawn(Raft.follower(Set(node.testActor), 1, None), "follower")
+
+    ctx.spawn(Actor.withTimers[Unit] { timer =>
+      timer.startPeriodicTimer("", (), 400.milliseconds)
+      Actor.immutable { (_, _) =>
+        follower ! Raft.Heartbeat(0)
+        Actor.same
+      }
+    }, "oldLeader")
+
+
+    node.expectMsg(500.milliseconds, Raft.VoteRequest(follower, term = 2))
   }
 
   it should "vote for a legitimate new leader" in cluster { implicit ctx =>
