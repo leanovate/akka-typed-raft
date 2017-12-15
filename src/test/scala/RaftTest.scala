@@ -110,7 +110,7 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
   }
 
   "candidates" should "become leaders when receiving vote responses from the majority" in cluster { implicit ctx =>
-    val follower = (1 to 4 map { _ => TestProbe[Raft.Message]("node") }).toSet
+    val follower = fiveProbes
     val followerActors = follower.map(_.testActor)
     val candidate = ctx.spawn(Raft.candidate(followerActors, 2), "candidate")
 
@@ -118,13 +118,14 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
       candidate ! Raft.VoteResponse(2)
     }
 
-    follower.foreach {
-      _.expectMsg(Raft.Heartbeat)
+    follower.foreach { f =>
+      f.expectMsg(Raft.VoteRequest(candidate, 2))
+      f.expectMsg(Raft.Heartbeat)
     }
   }
 
   it should "not confuse vote response from different terms" in cluster { implicit ctx =>
-    val follower = (1 to 4 map { _ => TestProbe[Raft.Message]("node") }).toSet
+    val follower = fiveProbes
     val followerActors = follower.map(_.testActor)
     val candidate = ctx.spawn(Raft.candidate(followerActors, 4), "candidate")
 
@@ -133,9 +134,26 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
     candidate ! Raft.VoteResponse(3)
     candidate ! Raft.VoteResponse(4)
 
-    follower.foreach {
-      _.expectNoMsg(20.milliseconds)
+    follower.foreach { f =>
+      f.expectMsg(Raft.VoteRequest(candidate, 4))
+      f.expectNoMsg(20.milliseconds)
     }
   }
+
+  it should "start a new term if no new leader was found" in cluster { implicit ctx =>
+    val follower = fiveProbes
+    val followerActors = follower.map(_.testActor)
+    val candidate = ctx.spawn(Raft.candidate(followerActors, 4), "candidate")
+
+    candidate ! Raft.VoteResponse(2)
+
+    follower.foreach { f =>
+      f.expectMsg(Raft.VoteRequest(candidate, 4))
+      f.expectMsg(Raft.VoteRequest(candidate, 5))
+    }
+  }
+
+  private def fiveProbes(implicit ctx: ActorContext[_]) =
+    (1 to 4 map { _ => TestProbe[Raft.Message]("node") }).toSet
 
 }
