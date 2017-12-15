@@ -17,7 +17,7 @@ object Raft {
           nodes.foreach(_ ! Heartbeat)
           Actor.same
         case VoteRequest(newLeader, newTerm) if newTerm > currentTerm =>
-          newLeader ! VoteResponse()
+          newLeader ! VoteResponse(newTerm)
           follower(nodes, newTerm, Some(newLeader))
         case VoteRequest(c, oldTerm) if oldTerm <= currentTerm =>
           Actor.same
@@ -42,7 +42,7 @@ object Raft {
         case VoteRequest(candidate, newTerm) if newTerm >= currentTerm =>
           timer.cancelAll()
           timer.startSingleTimer("", LeaderTimeout, 2.seconds)
-          candidate ! VoteResponse()
+          candidate ! VoteResponse(newTerm)
           Actor.same
       }
 
@@ -52,10 +52,12 @@ object Raft {
   def candidate(nodes: Set[ActorRef[Message]], currentTerm: Int): Behavior[Message] = {
     def waitingCandidate(votes: Int): Behavior[Message] = Actor.immutable { (ctx, msg) =>
       msg match {
-        case VoteResponse() if (votes + 1) > (nodes.size / 2) =>
+        case VoteResponse(oldTerm) if oldTerm < currentTerm =>
+          Actor.same
+        case VoteResponse(term) if (votes + 1) > (nodes.size / 2) =>
           nodes.foreach(_ ! Heartbeat)
           leader(nodes, currentTerm)
-        case VoteResponse() =>
+        case VoteResponse(term) =>
           waitingCandidate(votes + 1)
       }
     }
@@ -72,6 +74,6 @@ object Raft {
   val LeaderTimeout: Timeout.type = Timeout
   case class VoteRequest(candidate: ActorRef[Message], term: Int) extends Message
 
-  case class VoteResponse() extends Message
+  case class VoteResponse(term: Int) extends Message
 
 }

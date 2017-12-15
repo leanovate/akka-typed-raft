@@ -54,7 +54,7 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
 
     oldLeader ! Raft.VoteRequest(newCandidateActor, term = 2)
 
-    newCandidate.expectMsg(Raft.VoteResponse())
+    newCandidate.expectMsg(Raft.VoteResponse(2))
   }
 
   it should "ignore vote request for the current and older terms" in cluster { implicit ctx =>
@@ -86,7 +86,7 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
 
     follower ! Raft.VoteRequest(newLeaderActor, term = 2)
 
-    newLeader.expectMsg(Raft.VoteResponse())
+    newLeader.expectMsg(Raft.VoteResponse(2))
   }
 
   it should "not vote for two different candidates during one term" in cluster { implicit ctx =>
@@ -115,10 +115,27 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
     val candidate = ctx.spawn(Raft.candidate(followerActors, 2), "candidate")
 
     followerActors.foreach { ref =>
-      candidate ! Raft.VoteResponse()
+      candidate ! Raft.VoteResponse(2)
     }
 
-    follower.head.expectMsg(Raft.Heartbeat)
+    follower.foreach {
+      _.expectMsg(Raft.Heartbeat)
+    }
+  }
+
+  it should "not confuse vote response from different terms" in cluster { implicit ctx =>
+    val follower = (1 to 4 map { _ => TestProbe[Raft.Message]("node") }).toSet
+    val followerActors = follower.map(_.testActor)
+    val candidate = ctx.spawn(Raft.candidate(followerActors, 4), "candidate")
+
+    candidate ! Raft.VoteResponse(1)
+    candidate ! Raft.VoteResponse(2)
+    candidate ! Raft.VoteResponse(3)
+    candidate ! Raft.VoteResponse(4)
+
+    follower.foreach {
+      _.expectNoMsg(20.milliseconds)
+    }
   }
 
 }
