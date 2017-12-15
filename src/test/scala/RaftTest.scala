@@ -1,42 +1,11 @@
-import java.util.concurrent.atomic.AtomicReference
-
-import akka.typed.ActorSystem
+import ClusterTest._
 import akka.typed.scaladsl.{Actor, ActorContext}
-import akka.typed.testkit.TestKitSettings
 import akka.typed.testkit.scaladsl.TestProbe
-import org.scalatest.concurrent.Eventually
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
-import scala.util.Try
 
-class RaftTest extends FlatSpec with Matchers with Eventually {
-
-  implicit def systemFromContext(implicit ctx: ActorContext[_]): ActorSystem[_] =
-    ctx.system
-
-  implicit def testKitSettingsFromContext(implicit ctx: ActorContext[_]): TestKitSettings =
-    TestKitSettings(ctx.system)
-
-  def cluster(testcase: ActorContext[_] => Unit): Unit = {
-    val res = new AtomicReference[Option[Throwable]]
-
-    val cluster = Actor.deferred[Nothing] { implicit ctx =>
-      res.set(Try {
-        testcase(ctx)
-      }.toEither.left.toOption)
-
-      Actor.stopped
-    }
-
-    val system = ActorSystem[Nothing](cluster, "actor-system")
-
-    Await.result(system.whenTerminated, 20.seconds)
-
-    res.get().foreach(throw _)
-  }
-
+class RaftTest extends FlatSpec with Matchers {
 
   "leaders" should "send heartbeats regularly" in cluster { implicit ctx =>
     val follower = TestProbe[Raft.Message]("follower")
