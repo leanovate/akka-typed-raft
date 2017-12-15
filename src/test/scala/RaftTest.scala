@@ -44,28 +44,26 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
 
     leader ! Raft.HeartbeatTick
 
-    follower.expectMsg(Raft.Heartbeat)
+    follower.expectMsg(Raft.Heartbeat(1))
   }
 
   it should "vote for a new legitimate new leader" in cluster { implicit ctx =>
     val newCandidate = TestProbe[Raft.Message]("node")
-    val newCandidateActor = newCandidate.testActor
-    val oldLeader = ctx.spawn(Raft.leader(Set(newCandidateActor), 1), "oldLeader")
+    val oldLeader = ctx.spawn(Raft.leader(Set(newCandidate.testActor), 1), "oldLeader")
 
-    oldLeader ! Raft.VoteRequest(newCandidateActor, term = 2)
+    oldLeader ! Raft.VoteRequest(newCandidate.testActor, term = 2)
 
     newCandidate.expectMsg(Raft.VoteResponse(2))
   }
 
   it should "ignore vote request for the current and older terms" in cluster { implicit ctx =>
     val oldCandidate = TestProbe[Raft.Message]("node")
-    val newCandidateActor = oldCandidate.testActor
-    val leader = ctx.spawn(Raft.leader(Set(newCandidateActor), currentTerm = 2), "leader")
+    val leader = ctx.spawn(Raft.leader(Set(oldCandidate.testActor), currentTerm = 2), "leader")
 
-    leader ! Raft.VoteRequest(newCandidateActor, term = 2)
+    leader ! Raft.VoteRequest(oldCandidate.testActor, term = 2)
     oldCandidate.expectNoMsg(20.milliseconds)
 
-    leader ! Raft.VoteRequest(newCandidateActor, term = 1)
+    leader ! Raft.VoteRequest(oldCandidate.testActor, term = 1)
     oldCandidate.expectNoMsg(20.milliseconds)
   }
 
@@ -81,30 +79,27 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
 
   it should "vote for a legitimate new leader" in cluster { implicit ctx =>
     val newLeader = TestProbe[Raft.Message]("node")
-    val newLeaderActor = newLeader.testActor
-    val follower = ctx.spawn(Raft.follower(Set(newLeaderActor), 1, None), "follower")
+    val follower = ctx.spawn(Raft.follower(Set(newLeader.testActor), 1, None), "follower")
 
-    follower ! Raft.VoteRequest(newLeaderActor, term = 2)
+    follower ! Raft.VoteRequest(newLeader.testActor, term = 2)
 
     newLeader.expectMsg(Raft.VoteResponse(2))
   }
 
   it should "not vote for two different candidates during one term" in cluster { implicit ctx =>
     val newLeader = TestProbe[Raft.Message]("node")
-    val newLeaderActor = newLeader.testActor
-    val follower = ctx.spawn(Raft.follower(Set(newLeaderActor), 1, Some(ctx.system.deadLetters)), "follower")
+    val follower = ctx.spawn(Raft.follower(Set(newLeader.testActor), 1, Some(ctx.system.deadLetters)), "follower")
 
-    follower ! Raft.VoteRequest(newLeaderActor, term = 1)
+    follower ! Raft.VoteRequest(newLeader.testActor, term = 1)
 
     newLeader.expectNoMsg(20.milliseconds)
   }
 
   it should "not respond to vote requests from old terms" in cluster { implicit ctx =>
-    val newLeader = TestProbe[Raft.Message]("node")
-    val newLeaderActor = newLeader.testActor
-    val follower = ctx.spawn(Raft.follower(Set(newLeaderActor), 2, None), "follower")
+    val newLeader = TestProbe[Raft.Message]("newLeader")
+    val follower = ctx.spawn(Raft.follower(Set(newLeader.testActor), 2, None), "follower")
 
-    follower ! Raft.VoteRequest(newLeaderActor, term = 1)
+    follower ! Raft.VoteRequest(newLeader.testActor, term = 1)
 
     newLeader.expectNoMsg(20.milliseconds)
   }
@@ -120,7 +115,7 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
 
     follower.foreach { f =>
       f.expectMsg(Raft.VoteRequest(candidate, 2))
-      f.expectMsg(Raft.Heartbeat)
+      f.expectMsg(Raft.Heartbeat(2))
     }
   }
 
@@ -150,6 +145,34 @@ class RaftTest extends FlatSpec with Matchers with Eventually {
     follower.foreach { f =>
       f.expectMsg(Raft.VoteRequest(candidate, 4))
       f.expectMsg(Raft.VoteRequest(candidate, 5))
+    }
+  }
+
+  it should "become follower if a heartbeat is received" in cluster { implicit ctx =>
+    val newLeader = TestProbe[Raft.Message]("newLeader")
+    val follower = fiveProbes
+    val followerActors = follower.map(_.testActor)
+    val candidate = ctx.spawn(Raft.candidate(followerActors, 2), "candidate")
+
+    candidate ! Raft.Heartbeat(2)
+
+    follower.foreach { f =>
+      f.expectMsg(Raft.VoteRequest(candidate, 2))
+      f.expectNoMsg(50.milliseconds)
+    }
+  }
+
+  it should "ignore old heartbeats" in cluster { implicit ctx =>
+    val newLeader = TestProbe[Raft.Message]("newLeader")
+    val follower = fiveProbes
+    val followerActors = follower.map(_.testActor)
+    val candidate = ctx.spawn(Raft.candidate(followerActors, 2), "candidate")
+
+    candidate ! Raft.Heartbeat(1)
+
+    follower.foreach { f =>
+      f.expectMsg(Raft.VoteRequest(candidate, 2))
+      f.expectMsg(Raft.VoteRequest(candidate, 3))
     }
   }
 

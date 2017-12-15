@@ -16,7 +16,7 @@ object Raft {
       Actor.immutable { (ctx, msg) =>
         msg match {
           case HeartbeatTick =>
-            nodes.foreach(_ ! Heartbeat)
+            nodes.foreach(_ ! Heartbeat(currentTerm))
             Actor.same
           case VoteRequest(newLeader, newTerm) if newTerm > currentTerm =>
             newLeader ! VoteResponse(newTerm)
@@ -31,25 +31,27 @@ object Raft {
   }
 
   def follower(nodes: Set[ActorRef[Message]], currentTerm: Int, votedFor: Option[ActorRef[Message]]): Behavior[Message] = Actor.withTimers { timer =>
-    Actor.immutable { (ctx, msg) =>
-      msg match {
-        case LeaderTimeout =>
-          candidate(nodes, currentTerm + 1)
-        case Heartbeat =>
-          timer.cancelAll()
-          timer.startSingleTimer("", LeaderTimeout, 2.seconds)
-          Actor.same
-        case VoteRequest(candidate, newTerm) if newTerm == currentTerm && votedFor != Some(candidate) =>
-          Actor.same
-        case VoteRequest(_, oldTerm) if oldTerm < currentTerm =>
-          Actor.same
-        case VoteRequest(candidate, newTerm) if newTerm >= currentTerm =>
-          timer.cancelAll()
-          timer.startSingleTimer("", LeaderTimeout, 2.seconds)
-          candidate ! VoteResponse(newTerm)
-          Actor.same
+    Actor.deferred { ctx =>
+      println(ctx.self + " became follower")
+      Actor.immutable { (ctx, msg) =>
+        msg match {
+          case LeaderTimeout =>
+            candidate(nodes, currentTerm + 1)
+          case Heartbeat(term) =>
+            timer.cancelAll()
+            timer.startSingleTimer("", LeaderTimeout, 2.seconds)
+            Actor.same
+          case VoteRequest(candidate, newTerm) if newTerm == currentTerm && votedFor != Some(candidate) =>
+            Actor.same
+          case VoteRequest(_, oldTerm) if oldTerm < currentTerm =>
+            Actor.same
+          case VoteRequest(candidate, newTerm) if newTerm >= currentTerm =>
+            timer.cancelAll()
+            timer.startSingleTimer("", LeaderTimeout, 2.seconds)
+            candidate ! VoteResponse(newTerm)
+            Actor.same
+        }
       }
-
     }
   }
 
@@ -64,17 +66,23 @@ object Raft {
         case VoteResponse(oldTerm) if oldTerm < currentTerm =>
           Actor.same
         case VoteResponse(term) if (term == currentTerm) && (votes + 1) > (nodes.size / 2) =>
-          nodes.foreach(_ ! Heartbeat)
+          nodes.foreach(_ ! Heartbeat(term))
           leader(nodes, currentTerm)
         case VoteResponse(term) =>
           waitingCandidate(votes + 1)
         case CandidateTimeout =>
           println(ctx.self + " candidate timeout, start new term")
           candidate(nodes, currentTerm + 1)
+        case Heartbeat(newTerm) if newTerm >= currentTerm =>
+          timer.cancelAll()
+          follower(nodes, newTerm, None)
+        case Heartbeat(_) =>
+          Actor.same
       }
     }
 
     Actor.deferred { ctx =>
+      println(ctx.self + " became candidate")
       (nodes - ctx.self).foreach(_ ! VoteRequest(ctx.self, currentTerm))
 
       waitingCandidate(1 /* one self vote */)
@@ -84,7 +92,7 @@ object Raft {
 
   sealed trait Message
 
-  case object Heartbeat extends Message
+  case class Heartbeat(term: Int) extends Message
 
   case object Timeout extends Message
 
