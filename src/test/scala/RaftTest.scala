@@ -49,7 +49,7 @@ class RaftTest extends FlatSpec with Matchers {
     val follower = ctx.spawn(Raft.follower(Set(node.testActor), 1, None), "follower")
 
     ctx.spawn(Actor.withTimers[Unit] { timer =>
-      timer.startPeriodicTimer("", (), 400.milliseconds)
+      timer.startPeriodicTimer("", (), 200.milliseconds)
       Actor.immutable { (_, _) =>
         follower ! Raft.Heartbeat(0)
         Actor.same

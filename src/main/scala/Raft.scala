@@ -39,13 +39,13 @@ object Raft {
           case LeaderTimeout =>
             timer.cancelAll()
             candidate(nodes, currentTerm + 1)
-          case Heartbeat(term) =>
+          case TermMessage(oldTerm) if oldTerm < currentTerm =>
+            Actor.same
+          case Heartbeat(_) =>
             timer.cancelAll()
             timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
             Actor.same
           case VoteRequest(candidate, `currentTerm`) if votedFor != Some(candidate) =>
-            Actor.same
-          case VoteRequest(_, oldTerm) if oldTerm < currentTerm =>
             Actor.same
           case VoteRequest(candidate, newTerm) if newTerm >= currentTerm =>
             timer.cancelAll()
@@ -94,16 +94,24 @@ object Raft {
 
   sealed trait Message
 
-  case class Heartbeat(term: Int) extends Message
+  sealed trait TermMessage extends Message {
+    def term: Int
+  }
+
+  object TermMessage {
+    def unapply(arg: TermMessage): Option[Int] = Some(arg.term)
+  }
+
+  case class Heartbeat(term: Int) extends TermMessage
+
+  case class VoteRequest(candidate: ActorRef[Message], term: Int) extends TermMessage
+
+  case class VoteResponse(term: Int) extends TermMessage
 
   case object Timeout extends Message
 
   val HeartbeatTick: Timeout.type = Timeout
   val LeaderTimeout: Timeout.type = Timeout
   val CandidateTimeout: Timeout.type = Timeout
-
-  case class VoteRequest(candidate: ActorRef[Message], term: Int) extends Message
-
-  case class VoteResponse(term: Int) extends Message
 
 }
