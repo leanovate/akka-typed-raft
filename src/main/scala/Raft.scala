@@ -1,98 +1,116 @@
 
-import akka.typed.scaladsl.Actor
+import akka.typed.scaladsl.{Actor, TimerScheduler}
 import akka.typed.{ActorRef, Behavior}
 
 import scala.concurrent.duration.DurationLong
 
 object Raft {
 
-  def behavior: Behavior[Message] =
-    follower(Set.empty, 0, None)
+  def behavior: Behavior[Message] = Actor.withTimers { timer =>
+    new Node(Set.empty, timer).follower(0, None)
+  }
 
+  class Node(nodes: Set[ActorRef[Message]], timer: TimerScheduler[Message]) {
 
-  def leader(nodes: Set[ActorRef[Message]], currentTerm: Int): Behavior[Message] = Actor.withTimers { timer =>
-    Actor.deferred { ctx =>
-      println(ctx.self + " became leader")
-      Actor.immutable { (ctx, msg) =>
+    def leader(currentTerm: Int): Behavior[Message] = {
+      Actor.deferred { ctx =>
+        println(ctx.self + " became leader")
+        timer.startPeriodicTimer("", HeartbeatTick, 150.milliseconds)
+        Actor.immutable { (_, msg) =>
+          msg match {
+            case HeartbeatTick =>
+              nodes.foreach(_ ! Heartbeat(currentTerm))
+              Actor.same
+            case VoteRequest(newLeader, newTerm) if newTerm > currentTerm =>
+              newLeader ! VoteResponse(newTerm)
+              timer.cancelAll()
+              follower(newTerm, Some(newLeader))
+            case VoteRequest(_, oldTerm) if oldTerm <= currentTerm =>
+              Actor.same
+            case _: VoteResponse =>
+              Actor.same
+          }
+        }
+      }
+    }
+
+    def follower(currentTerm: Int, votedFor: Option[ActorRef[Message]]): Behavior[Message] = {
+      def resetTimer(): Unit = {
+        timer.cancelAll()
+        timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
+      }
+
+      Actor.deferred { ctx =>
+        resetTimer()
+        println(ctx.self + s" became follower in term $currentTerm")
+        Actor.immutable { (_, msg) =>
+          msg match {
+            case LeaderTimeout =>
+              timer.cancelAll()
+              candidate(currentTerm + 1)
+            case TermMessage(oldTerm) if oldTerm < currentTerm =>
+              Actor.same
+            case Heartbeat(newTerm) if newTerm > currentTerm =>
+              follower(newTerm, None)
+            case Heartbeat(`currentTerm`) =>
+              resetTimer()
+              Actor.same
+            case VoteRequest(candidate, `currentTerm`) if votedFor != Some(candidate) =>
+              Actor.same
+            case VoteRequest(candidate, newTerm) if newTerm >= currentTerm =>
+              resetTimer()
+              candidate ! VoteResponse(newTerm)
+              Actor.same
+          }
+        }
+      }
+    }
+
+    def candidate(currentTerm: Int): Behavior[Message] = {
+      timer.startSingleTimer("", CandidateTimeout, candidateTimeout)
+
+      def waitingCandidate(votes: Int): Behavior[Message] = Actor.immutable { (ctx, msg) =>
         msg match {
-          case HeartbeatTick =>
+          case VoteResponse(`currentTerm`) if (votes + 1) > (nodes.size / 2) =>
             nodes.foreach(_ ! Heartbeat(currentTerm))
+            leader(currentTerm)
+          case VoteResponse(`currentTerm`) =>
+            waitingCandidate(votes + 1)
+          case VoteResponse(_) =>
             Actor.same
-          case VoteRequest(newLeader, newTerm) if newTerm > currentTerm =>
-            newLeader ! VoteResponse(newTerm)
-            follower(nodes, newTerm, Some(newLeader))
-          case VoteRequest(c, oldTerm) if oldTerm <= currentTerm =>
-            Actor.same
-          case _: VoteResponse =>
+          case CandidateTimeout =>
+            println(ctx.self + " candidate timeout, start new term")
+            candidate(currentTerm + 1)
+          case Heartbeat(newTerm) if newTerm >= currentTerm =>
+            timer.cancelAll()
+            new Node(nodes, timer).follower(newTerm, None)
+          case Heartbeat(_) =>
             Actor.same
         }
+      }
+
+      Actor.deferred { ctx =>
+        println(ctx.self + " became candidate")
+        (nodes - ctx.self).foreach(_ ! VoteRequest(ctx.self, currentTerm))
+
+        waitingCandidate(1 /* one self vote */)
       }
     }
   }
 
+
+  def leader(nodes: Set[ActorRef[Message]], currentTerm: Int): Behavior[Message] = Actor.withTimers { timer =>
+    new Node(nodes, timer).leader(currentTerm)
+  }
+
   def follower(nodes: Set[ActorRef[Message]], currentTerm: Int, votedFor: Option[ActorRef[Message]]): Behavior[Message] = Actor.withTimers { timer =>
-    Actor.deferred { ctx =>
-      timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
-      println(ctx.self + s" became follower in term $currentTerm")
-      Actor.immutable { (_, msg) =>
-        msg match {
-          case LeaderTimeout =>
-            timer.cancelAll()
-            candidate(nodes, currentTerm + 1)
-          case TermMessage(oldTerm) if oldTerm < currentTerm =>
-            Actor.same
-          case Heartbeat(newTerm) if newTerm > currentTerm =>
-            timer.cancelAll()
-            timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
-            follower(nodes, newTerm, None)
-          case Heartbeat(`currentTerm`) =>
-            timer.cancelAll()
-            timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
-            Actor.same
-          case VoteRequest(candidate, `currentTerm`) if votedFor != Some(candidate) =>
-            Actor.same
-          case VoteRequest(candidate, newTerm) if newTerm >= currentTerm =>
-            timer.cancelAll()
-            timer.startSingleTimer("", LeaderTimeout, 2.seconds)
-            candidate ! VoteResponse(newTerm)
-            Actor.same
-        }
-      }
-    }
+    new Node(nodes, timer).follower(currentTerm, votedFor)
   }
 
   private val candidateTimeout = 200.milliseconds
 
   def candidate(nodes: Set[ActorRef[Message]], currentTerm: Int): Behavior[Message] = Actor.withTimers { timer =>
-    timer.startSingleTimer("", CandidateTimeout, candidateTimeout)
-
-
-    def waitingCandidate(votes: Int): Behavior[Message] = Actor.immutable { (ctx, msg) =>
-      msg match {
-        case VoteResponse(`currentTerm`) if (votes + 1) > (nodes.size / 2) =>
-          nodes.foreach(_ ! Heartbeat(currentTerm))
-          leader(nodes, currentTerm)
-        case VoteResponse(`currentTerm`) =>
-          waitingCandidate(votes + 1)
-        case VoteResponse(_) =>
-          Actor.same
-        case CandidateTimeout =>
-          println(ctx.self + " candidate timeout, start new term")
-          candidate(nodes, currentTerm + 1)
-        case Heartbeat(newTerm) if newTerm >= currentTerm =>
-          timer.cancelAll()
-          follower(nodes, newTerm, None)
-        case Heartbeat(_) =>
-          Actor.same
-      }
-    }
-
-    Actor.deferred { ctx =>
-      println(ctx.self + " became candidate")
-      (nodes - ctx.self).foreach(_ ! VoteRequest(ctx.self, currentTerm))
-
-      waitingCandidate(1 /* one self vote */)
-    }
+    new Node(nodes, timer).candidate(currentTerm)
   }
 
 

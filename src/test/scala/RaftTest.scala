@@ -69,7 +69,7 @@ class RaftTest extends FlatSpec with Matchers {
     otherNode.expectMsg(1.second, Raft.VoteRequest(follower, 4))
   }
 
-  ignore should "some problems with the timer" in cluster { implicit ctx =>
+  it should "restart its timer after being a candidate and reverting back to follower" in cluster { implicit ctx =>
     val otherNode = TestProbe[Raft.Message]("node")
     val follower = ctx.spawn(Raft.follower(Set(otherNode.testActor), 1, None), "broken follower")
 
