@@ -31,17 +31,21 @@ object Raft {
   }
 
   def follower(nodes: Set[ActorRef[Message]], currentTerm: Int, votedFor: Option[ActorRef[Message]]): Behavior[Message] = Actor.withTimers { timer =>
-    timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
     Actor.deferred { ctx =>
-      println(ctx.self + " became follower")
-      Actor.immutable { (ctx, msg) =>
+      timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
+      println(ctx.self + s" became follower in term $currentTerm")
+      Actor.immutable { (_, msg) =>
         msg match {
           case LeaderTimeout =>
             timer.cancelAll()
             candidate(nodes, currentTerm + 1)
           case TermMessage(oldTerm) if oldTerm < currentTerm =>
             Actor.same
-          case Heartbeat(_) =>
+          case Heartbeat(newTerm) if newTerm > currentTerm =>
+            timer.cancelAll()
+            timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
+            follower(nodes, newTerm, None)
+          case Heartbeat(`currentTerm`) =>
             timer.cancelAll()
             timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
             Actor.same

@@ -60,6 +60,28 @@ class RaftTest extends FlatSpec with Matchers {
     node.expectMsg(500.milliseconds, Raft.VoteRequest(follower, term = 2))
   }
 
+  it should "update its term when receiving a heartbeat with newer term number" in cluster { implicit ctx =>
+    val otherNode = TestProbe[Raft.Message]("node")
+    val follower = ctx.spawn(Raft.follower(Set(otherNode.testActor), 1, None), "follower")
+
+    follower ! Raft.Heartbeat(term = 3)
+
+    otherNode.expectMsg(1.second, Raft.VoteRequest(follower, 4))
+  }
+
+  ignore should "some problems with the timer" in cluster { implicit ctx =>
+    val otherNode = TestProbe[Raft.Message]("node")
+    val follower = ctx.spawn(Raft.follower(Set(otherNode.testActor), 1, None), "broken follower")
+
+    follower ! Raft.Heartbeat(term = 3)
+
+    otherNode.expectMsg(1.second, Raft.VoteRequest(follower, 4))
+
+    follower ! Raft.Heartbeat(term = 5)
+
+    otherNode.expectMsg(1.second, Raft.VoteRequest(follower, 6))
+  }
+
   it should "vote for a legitimate new leader" in cluster { implicit ctx =>
     val newLeader = TestProbe[Raft.Message]("node")
     val follower = ctx.spawn(Raft.follower(Set(newLeader.testActor), 1, None), "follower")
