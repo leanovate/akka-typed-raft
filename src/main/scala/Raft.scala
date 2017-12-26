@@ -2,15 +2,28 @@
 import akka.typed.scaladsl.{Actor, TimerScheduler}
 import akka.typed.{ActorRef, Behavior}
 
-import scala.concurrent.duration.DurationLong
+import scala.annotation.tailrec
+import scala.concurrent.duration.{DurationLong, FiniteDuration}
 
 object Raft {
 
   def behavior: Behavior[Message] = Actor.withTimers { timer =>
-    new Node(Set.empty, timer).follower(0, None)
+    new ClusterConfiguration(Set.empty, timer,
+      leaderHeartbeat = 200.milliseconds,
+      followerTimeout = 500.milliseconds -> 800.milliseconds,
+      candidateTimeout = 300.milliseconds
+    ).follower(0, None)
   }
 
-  class Node(nodes: Set[ActorRef[Message]], timer: TimerScheduler[Message]) {
+  class ClusterConfiguration(
+                              nodes: Set[ActorRef[Message]],
+                              timer: TimerScheduler[Message],
+                              leaderHeartbeat: FiniteDuration,
+                              followerTimeout: (FiniteDuration, FiniteDuration),
+                              candidateTimeout: FiniteDuration) {
+
+    val (minimalFollowerTimeout, maximalFollowerTimeout) = followerTimeout
+    require(minimalFollowerTimeout < maximalFollowerTimeout)
 
     def leader(currentTerm: Int): Behavior[Message] = {
       Actor.deferred { ctx =>
@@ -34,10 +47,23 @@ object Raft {
       }
     }
 
+
+    @tailrec
+    final def randomFollowerTimeout(): FiniteDuration = {
+      val span = maximalFollowerTimeout - minimalFollowerTimeout
+
+      math.random() * span match {
+        case offset: FiniteDuration => minimalFollowerTimeout + offset
+        case unexpectedResult =>
+          println(s"Got $unexpectedResult during timeout generation, trying again")
+          randomFollowerTimeout()
+      }
+    }
+
     def follower(currentTerm: Int, votedFor: Option[ActorRef[Message]]): Behavior[Message] = {
       def resetTimer(): Unit = {
         timer.cancelAll()
-        timer.startSingleTimer("", LeaderTimeout, 300.milliseconds)
+        timer.startSingleTimer("", LeaderTimeout, randomFollowerTimeout())
       }
 
       Actor.deferred { ctx =>
@@ -83,7 +109,7 @@ object Raft {
             candidate(currentTerm + 1)
           case Heartbeat(newTerm) if newTerm >= currentTerm =>
             timer.cancelAll()
-            new Node(nodes, timer).follower(newTerm, None)
+            follower(newTerm, None)
           case Heartbeat(_) =>
             Actor.same
         }
@@ -97,22 +123,6 @@ object Raft {
       }
     }
   }
-
-
-  def leader(nodes: Set[ActorRef[Message]], currentTerm: Int): Behavior[Message] = Actor.withTimers { timer =>
-    new Node(nodes, timer).leader(currentTerm)
-  }
-
-  def follower(nodes: Set[ActorRef[Message]], currentTerm: Int, votedFor: Option[ActorRef[Message]]): Behavior[Message] = Actor.withTimers { timer =>
-    new Node(nodes, timer).follower(currentTerm, votedFor)
-  }
-
-  private val candidateTimeout = 200.milliseconds
-
-  def candidate(nodes: Set[ActorRef[Message]], currentTerm: Int): Behavior[Message] = Actor.withTimers { timer =>
-    new Node(nodes, timer).candidate(currentTerm)
-  }
-
 
   sealed trait Message
 
