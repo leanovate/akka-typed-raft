@@ -3,11 +3,13 @@ import Raft.{ClusterConfiguration, Message}
 import akka.typed.{ActorRef, Behavior}
 import akka.typed.scaladsl.{Actor, ActorContext, TimerScheduler}
 import akka.typed.testkit.scaladsl.TestProbe
+import org.scalacheck.Gen
+import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class RaftTest extends FlatSpec with Matchers {
+class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks {
 
 
   private val leaderHeartbeat = 200.milliseconds
@@ -215,6 +217,24 @@ class RaftTest extends FlatSpec with Matchers {
     follower.foreach { f =>
       f.expectMsg(Raft.VoteRequest(candidate, 2))
       f.expectMsg(Raft.VoteRequest(candidate, 3))
+    }
+  }
+
+  "minimal majority" should "be greater than the total opposition" in {
+    forAll(Gen.posNum[Int]) { clusterSize =>
+      val majority = Raft.minimalMajority(clusterSize)
+      val opposition = clusterSize - majority
+
+      majority should be > opposition
+    }
+  }
+
+  it should "be a minority with one vote less" in {
+    forAll(Gen.posNum[Int]) { clusterSize =>
+      val minority = Raft.minimalMajority(clusterSize) - 1
+      val opposition = clusterSize - minority
+
+      minority should be <= opposition
     }
   }
 

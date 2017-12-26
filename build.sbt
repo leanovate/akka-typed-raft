@@ -9,5 +9,6 @@ val akkaVersion = "2.5.8"
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-typed-testkit" % akkaVersion % Test,
-  "org.scalatest" %% "scalatest" % "3.0.4" % Test
+  "org.scalatest" %% "scalatest" % "3.0.4" % Test,
+  "org.scalacheck" %% "scalacheck" % "1.13.4" % Test
 )

@@ -95,13 +95,17 @@ object Raft {
     def candidate(currentTerm: Int): Behavior[Message] = {
       timer.startSingleTimer("", CandidateTimeout, candidateTimeout)
 
-      def waitingCandidate(votes: Int): Behavior[Message] = Actor.immutable { (ctx, msg) =>
+      def waitingCandidate(requiredVotes: Int): Behavior[Message] = Actor.immutable { (ctx, msg) =>
         msg match {
-          case VoteResponse(`currentTerm`) if (votes + 1) > (nodes.size / 2) =>
-            nodes.foreach(_ ! Heartbeat(currentTerm))
-            leader(currentTerm)
           case VoteResponse(`currentTerm`) =>
-            waitingCandidate(votes + 1)
+            val openVotes = requiredVotes - 1
+            if (openVotes == 0) {
+              ctx.self ! HeartbeatTick
+              leader(currentTerm)
+            } else {
+              waitingCandidate(openVotes)
+            }
+
           case VoteResponse(_) =>
             Actor.same
           case CandidateTimeout =>
@@ -119,10 +123,15 @@ object Raft {
         println(ctx.self + " became candidate")
         (nodes - ctx.self).foreach(_ ! VoteRequest(ctx.self, currentTerm))
 
-        waitingCandidate(1 /* one self vote */)
+        waitingCandidate(requiredConfirmations)
       }
     }
+
+    val requiredConfirmations: Int = minimalMajority(nodes.size) - 1 /* one self vote */
   }
+
+  def minimalMajority(clusterSize: Int): Int =
+    clusterSize / 2 + 1
 
   sealed trait Message
 
