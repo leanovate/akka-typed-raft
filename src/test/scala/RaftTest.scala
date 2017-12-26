@@ -12,11 +12,11 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks {
 
 
-  private val leaderHeartbeat = 200.milliseconds
-  private val followerTimeout = 500.milliseconds -> 800.milliseconds
+  private val leaderHeartbeat = 50.milliseconds
+  private val followerTimeout = 100.milliseconds -> 200.milliseconds
   private val (minimalFollowerTimeout, maximalFollowerTimeout) = followerTimeout
-  private val candidateTimeout = 300.milliseconds.ensuring(_ < minimalFollowerTimeout)
-  private val shortTime: FiniteDuration = 20.milliseconds
+  private val candidateTimeout = 70.milliseconds.ensuring(_ < minimalFollowerTimeout)
+  private val shortTime: FiniteDuration = 10.milliseconds
 
   def testConfiguration(nodes: Set[ActorRef[Message]],
                         timer: TimerScheduler[Message]) = new ClusterConfiguration(nodes, timer, leaderHeartbeat, followerTimeout, candidateTimeout)
