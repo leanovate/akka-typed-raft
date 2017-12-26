@@ -35,7 +35,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   "leaders" should "send heartbeats regularly" in cluster { implicit ctx =>
     val follower = TestProbe[Raft.Message]("follower")
-    val leader = ctx.spawn(newLeader(Set(follower.testActor), 1), "leader")
+    val leader = ctx.spawn(newLeader(Set(follower.ref), 1), "leader")
 
     leader ! Raft.HeartbeatTick
 
@@ -44,28 +44,28 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   it should "vote for a new legitimate new leader" in cluster { implicit ctx =>
     val newCandidate = TestProbe[Raft.Message]("node")
-    val oldLeader = ctx.spawn(newLeader(Set(newCandidate.testActor), 1), "oldLeader")
+    val oldLeader = ctx.spawn(newLeader(Set(newCandidate.ref), 1), "oldLeader")
 
-    oldLeader ! Raft.VoteRequest(newCandidate.testActor, term = 2)
+    oldLeader ! Raft.VoteRequest(newCandidate.ref, term = 2)
 
     newCandidate.expectMsg(Raft.VoteResponse(2))
   }
 
   it should "ignore vote request for the current and older terms" in cluster { implicit ctx =>
     val oldCandidate = TestProbe[Raft.Message]("node")
-    val leader = ctx.spawn(newLeader(Set(oldCandidate.testActor), currentTerm = 2), "leader")
+    val leader = ctx.spawn(newLeader(Set(oldCandidate.ref), currentTerm = 2), "leader")
 
-    leader ! Raft.VoteRequest(oldCandidate.testActor, term = 2)
+    leader ! Raft.VoteRequest(oldCandidate.ref, term = 2)
     oldCandidate.expectNoMsg(shortTime)
 
-    leader ! Raft.VoteRequest(oldCandidate.testActor, term = 1)
+    leader ! Raft.VoteRequest(oldCandidate.ref, term = 1)
     oldCandidate.expectNoMsg(shortTime)
   }
 
 
   "followers" should "send vote request if a timeout happens" in cluster { implicit ctx =>
     val node = TestProbe[Raft.Message]("node")
-    val follower = ctx.spawn(newFollower(Set(node.testActor), 1, None), "follower")
+    val follower = ctx.spawn(newFollower(Set(node.ref), 1, None), "follower")
 
     node.expectMsg(maximalFollowerTimeout * 2, Raft.VoteRequest(follower, term = 2))
   }
@@ -81,7 +81,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   it should "ignore heartbeats from previous leaders" in cluster { implicit ctx =>
     val node = TestProbe[Raft.Message]("node")
-    val follower = ctx.spawn(newFollower(Set(node.testActor), 1, None), "follower")
+    val follower = ctx.spawn(newFollower(Set(node.ref), 1, None), "follower")
 
     ctx.spawn(Actor.withTimers[Unit] { timer =>
       timer.startPeriodicTimer("", (), leaderHeartbeat)
@@ -97,7 +97,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   it should "update its term when receiving a heartbeat with newer term number" in cluster { implicit ctx =>
     val otherNode = TestProbe[Raft.Message]("node")
-    val follower = ctx.spawn(newFollower(Set(otherNode.testActor), 1, None), "follower")
+    val follower = ctx.spawn(newFollower(Set(otherNode.ref), 1, None), "follower")
 
     follower ! Raft.Heartbeat(term = 3)
 
@@ -106,7 +106,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   it should "restart its timer after being a candidate and reverting back to follower" in cluster { implicit ctx =>
     val otherNode = TestProbe[Raft.Message]("node")
-    val follower = ctx.spawn(newFollower(Set(otherNode.testActor), 1, None), "broken follower")
+    val follower = ctx.spawn(newFollower(Set(otherNode.ref), 1, None), "follower")
 
     follower ! Raft.Heartbeat(term = 3)
 
@@ -119,34 +119,34 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   it should "vote for a legitimate new leader" in cluster { implicit ctx =>
     val newLeader = TestProbe[Raft.Message]("node")
-    val follower = ctx.spawn(newFollower(Set(newLeader.testActor), 1, None), "follower")
+    val follower = ctx.spawn(newFollower(Set(newLeader.ref), 1, None), "follower")
 
-    follower ! Raft.VoteRequest(newLeader.testActor, term = 2)
+    follower ! Raft.VoteRequest(newLeader.ref, term = 2)
 
     newLeader.expectMsg(Raft.VoteResponse(2))
   }
 
   it should "not vote for two different candidates during one term" in cluster { implicit ctx =>
     val newLeader = TestProbe[Raft.Message]("node")
-    val follower = ctx.spawn(newFollower(Set(newLeader.testActor), 1, Some(ctx.system.deadLetters)), "follower")
+    val follower = ctx.spawn(newFollower(Set(newLeader.ref), 1, Some(ctx.system.deadLetters)), "follower")
 
-    follower ! Raft.VoteRequest(newLeader.testActor, term = 1)
+    follower ! Raft.VoteRequest(newLeader.ref, term = 1)
 
     newLeader.expectNoMsg(shortTime)
   }
 
   it should "not respond to vote requests from old terms" in cluster { implicit ctx =>
     val newLeaderPrope = TestProbe[Raft.Message]("newLeader")
-    val follower = ctx.spawn(newFollower(Set(newLeaderPrope.testActor), 2, None), "follower")
+    val follower = ctx.spawn(newFollower(Set(newLeaderPrope.ref), 2, None), "follower")
 
-    follower ! Raft.VoteRequest(newLeaderPrope.testActor, term = 1)
+    follower ! Raft.VoteRequest(newLeaderPrope.ref, term = 1)
 
     newLeaderPrope.expectNoMsg(shortTime)
   }
 
   "candidates" should "become leaders when receiving vote responses from the majority" in cluster { implicit ctx =>
     val follower = fiveProbes
-    val followerActors = follower.map(_.testActor)
+    val followerActors = follower.map(_.ref)
     val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
 
     followerActors.foreach { ref =>
@@ -161,7 +161,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   it should "not confuse vote responses from different terms" in cluster { implicit ctx =>
     val follower = fiveProbes
-    val followerActors = follower.map(_.testActor)
+    val followerActors = follower.map(_.ref)
     val candidate = ctx.spawn(newCandidate(followerActors, 4), "candidate")
 
     candidate ! Raft.VoteResponse(1)
@@ -181,7 +181,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   it should "start a new term if no new leader was found" in cluster { implicit ctx =>
     val follower = fiveProbes
-    val followerActors = follower.map(_.testActor)
+    val followerActors = follower.map(_.ref)
     val candidate = ctx.spawn(newCandidate(followerActors, 4), "candidate")
 
     candidate ! Raft.VoteResponse(2)
@@ -192,10 +192,10 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
     }
   }
 
-  it should "become follower if a heartbeat is received" in cluster { implicit ctx =>
+  it should "become a follower if a heartbeat is received" in cluster { implicit ctx =>
     val newLeader = TestProbe[Raft.Message]("newLeader")
     val follower = fiveProbes
-    val followerActors = follower.map(_.testActor)
+    val followerActors = follower.map(_.ref)
     val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
 
     candidate ! Raft.Heartbeat(2)
@@ -209,7 +209,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
   it should "ignore old heartbeats" in cluster { implicit ctx =>
     val newLeader = TestProbe[Raft.Message]("newLeader")
     val follower = fiveProbes
-    val followerActors = follower.map(_.testActor)
+    val followerActors = follower.map(_.ref)
     val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
 
     candidate ! Raft.Heartbeat(1)
