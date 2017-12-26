@@ -15,7 +15,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
   private val leaderHeartbeat = 200.milliseconds
   private val followerTimeout = 500.milliseconds -> 800.milliseconds
   private val (minimalFollowerTimeout, maximalFollowerTimeout) = followerTimeout
-  private val candidateTimeout = 300.milliseconds
+  private val candidateTimeout = 300.milliseconds.ensuring(_ < minimalFollowerTimeout)
   private val shortTime: FiniteDuration = 20.milliseconds
 
   def testConfiguration(nodes: Set[ActorRef[Message]],
@@ -198,11 +198,15 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
     val followerActors = follower.map(_.ref)
     val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
 
+    follower.foreach {
+      _.expectMsg(Raft.VoteRequest(candidate, 2))
+    }
+
     candidate ! Raft.Heartbeat(2)
 
-    follower.foreach { f =>
-      f.expectMsg(Raft.VoteRequest(candidate, 2))
-      f.expectNoMsg(shortTime)
+    follower.par.foreach { f =>
+      f.expectNoMsg(candidateTimeout)
+      f.expectMsg(maximalFollowerTimeout, Raft.VoteRequest(candidate, 3))
     }
   }
 
