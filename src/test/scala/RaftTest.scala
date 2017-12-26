@@ -210,6 +210,23 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
     }
   }
 
+  it should "become a follower if a vote request with a more recent term is received" in cluster { implicit ctx =>
+    val newLeader = TestProbe[Raft.Message]("newLeader")
+    val follower = fiveProbes
+    val followerActors = follower.map(_.ref)
+    val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
+
+    follower.foreach {
+      _.expectMsg(Raft.VoteRequest(candidate, 2))
+    }
+
+    candidate ! Raft.VoteRequest(newLeader.ref, 3)
+
+    follower.foreach {
+      _.expectMsg(Raft.VoteRequest(candidate, 4))
+    }
+  }
+
   it should "ignore old heartbeats" in cluster { implicit ctx =>
     val newLeader = TestProbe[Raft.Message]("newLeader")
     val follower = fiveProbes

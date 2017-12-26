@@ -111,7 +111,7 @@ object Raft {
           case CandidateTimeout =>
             println(ctx.self + " candidate timeout, start new term")
             candidate(currentTerm + 1)
-          case Heartbeat(newTerm) if newTerm >= currentTerm =>
+          case TermMessage(newTerm) if newTerm >= currentTerm =>
             timer.cancelAll()
             follower(newTerm, None)
           case Heartbeat(_) =>
