@@ -71,12 +71,15 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
   }
 
   it should "generate random timeouts in" in {
-    val samples = List.fill(2000)(testConfiguration(Set.empty, null).randomFollowerTimeout())
+    withClue("this test has the very unlikely random chance to fail") {
+      val config = testConfiguration(Set.empty, null)
+      val samples = Array.fill(2000)(config.randomFollowerTimeout())
 
-    samples.min should be >= minimalFollowerTimeout
-    samples.max should be <= maximalFollowerTimeout
+      samples.min should be >= minimalFollowerTimeout
+      samples.max should be <= maximalFollowerTimeout
 
-    (samples.max - samples.min) should be >= (maximalFollowerTimeout - minimalFollowerTimeout) * 0.8
+      (samples.max - samples.min) should be >= (maximalFollowerTimeout - minimalFollowerTimeout) * 0.8
+    }
   }
 
   it should "ignore heartbeats from previous leaders" in cluster { implicit ctx =>
