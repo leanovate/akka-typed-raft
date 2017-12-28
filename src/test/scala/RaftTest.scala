@@ -35,7 +35,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   "leaders" should "send heartbeats regularly" in cluster { implicit ctx =>
     val follower = TestProbe[Raft.Message]("follower")
-    val leader = ctx.spawn(newLeader(Set(follower.ref), 1), "leader")
+    val leader = ctx.spawn(newLeader(Set(follower.ref), currentTerm = 1), "leader")
 
     leader ! Raft.HeartbeatTick
 
@@ -44,7 +44,7 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
   it should "vote for a new legitimate new leader" in cluster { implicit ctx =>
     val newCandidate = TestProbe[Raft.Message]("node")
-    val oldLeader = ctx.spawn(newLeader(Set(newCandidate.ref), 1), "oldLeader")
+    val oldLeader = ctx.spawn(newLeader(Set(newCandidate.ref), currentTerm = 1), "oldLeader")
 
     oldLeader ! Raft.VoteRequest(newCandidate.ref, term = 2)
 
@@ -60,6 +60,8 @@ class RaftTest extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
 
     leader ! Raft.VoteRequest(oldCandidate.ref, term = 1)
     oldCandidate.expectNoMsg(shortTime)
+
+    oldCandidate.expectMsg(Raft.Heartbeat(term = 2))
   }
 
 
