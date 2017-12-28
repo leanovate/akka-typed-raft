@@ -1,4 +1,3 @@
-
 import ClusterTest._
 import akka.typed.testkit.scaladsl.TestProbe
 import org.scalatest.{FlatSpec, Matchers}

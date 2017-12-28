@@ -12,3 +12,6 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.4" % Test,
   "org.scalacheck" %% "scalacheck" % "1.13.4" % Test
 )
+
+scalafmtTestOnCompile in ThisBuild := true
+scalafmtFailTest in ThisBuild := false

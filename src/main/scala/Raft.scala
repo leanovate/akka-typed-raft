@@ -1,4 +1,3 @@
-
 import akka.typed.scaladsl.{Actor, TimerScheduler}
 import akka.typed.{ActorRef, Behavior}
 
@@ -8,19 +7,19 @@ import scala.concurrent.duration.{DurationLong, FiniteDuration}
 object Raft {
 
   def behavior: Behavior[Message] = Actor.withTimers { timer =>
-    new ClusterConfiguration(Set.empty, timer,
+    new ClusterConfiguration(
+      Set.empty,
+      timer,
       leaderHeartbeat = 200.milliseconds,
       followerTimeout = 500.milliseconds -> 800.milliseconds,
-      candidateTimeout = 300.milliseconds
-    ).follower(0, None)
+      candidateTimeout = 300.milliseconds).follower(0, None)
   }
 
-  class ClusterConfiguration(
-                              nodes: Set[ActorRef[Message]],
-                              timer: TimerScheduler[Message],
-                              leaderHeartbeat: FiniteDuration,
-                              followerTimeout: (FiniteDuration, FiniteDuration),
-                              candidateTimeout: FiniteDuration) {
+  class ClusterConfiguration(nodes: Set[ActorRef[Message]],
+                             timer: TimerScheduler[Message],
+                             leaderHeartbeat: FiniteDuration,
+                             followerTimeout: (FiniteDuration, FiniteDuration),
+                             candidateTimeout: FiniteDuration) {
 
     val (minimalFollowerTimeout, maximalFollowerTimeout) = followerTimeout
     require(minimalFollowerTimeout < maximalFollowerTimeout)
@@ -46,8 +45,6 @@ object Raft {
         }
       }
     }
-
-
     @tailrec
     final def randomFollowerTimeout(): FiniteDuration = {
       val span = maximalFollowerTimeout - minimalFollowerTimeout
@@ -55,12 +52,14 @@ object Raft {
       math.random() * span match {
         case offset: FiniteDuration => minimalFollowerTimeout + offset
         case unexpectedResult =>
-          println(s"Got $unexpectedResult during timeout generation, trying again")
+          println(
+            s"Got $unexpectedResult during timeout generation, trying again")
           randomFollowerTimeout()
       }
     }
 
-    def follower(currentTerm: Int, votedFor: Option[ActorRef[Message]]): Behavior[Message] = {
+    def follower(currentTerm: Int,
+                 votedFor: Option[ActorRef[Message]]): Behavior[Message] = {
       def resetTimer(): Unit = {
         timer.cancelAll()
         timer.startSingleTimer("", LeaderTimeout, randomFollowerTimeout())
@@ -81,7 +80,8 @@ object Raft {
             case Heartbeat(`currentTerm`) =>
               resetTimer()
               Actor.same
-            case VoteRequest(candidate, `currentTerm`) if votedFor != Some(candidate) =>
+            case VoteRequest(candidate, `currentTerm`)
+                if votedFor != Some(candidate) =>
               Actor.same
             case VoteRequest(candidate, newTerm) if newTerm >= currentTerm =>
               resetTimer()
@@ -95,29 +95,30 @@ object Raft {
     def candidate(currentTerm: Int): Behavior[Message] = {
       timer.startSingleTimer("", CandidateTimeout, candidateTimeout)
 
-      def waitingCandidate(requiredVotes: Int): Behavior[Message] = Actor.immutable { (ctx, msg) =>
-        msg match {
-          case VoteResponse(`currentTerm`) =>
-            val openVotes = requiredVotes - 1
-            if (openVotes == 0) {
-              ctx.self ! HeartbeatTick
-              leader(currentTerm)
-            } else {
-              waitingCandidate(openVotes)
-            }
+      def waitingCandidate(requiredVotes: Int): Behavior[Message] =
+        Actor.immutable { (ctx, msg) =>
+          msg match {
+            case VoteResponse(`currentTerm`) =>
+              val openVotes = requiredVotes - 1
+              if (openVotes == 0) {
+                ctx.self ! HeartbeatTick
+                leader(currentTerm)
+              } else {
+                waitingCandidate(openVotes)
+              }
 
-          case VoteResponse(_) =>
-            Actor.same
-          case CandidateTimeout =>
-            println(ctx.self + " candidate timeout, start new term")
-            candidate(currentTerm + 1)
-          case TermMessage(newTerm) if newTerm >= currentTerm =>
-            timer.cancelAll()
-            follower(newTerm, None)
-          case Heartbeat(_) =>
-            Actor.same
+            case VoteResponse(_) =>
+              Actor.same
+            case CandidateTimeout =>
+              println(ctx.self + " candidate timeout, start new term")
+              candidate(currentTerm + 1)
+            case TermMessage(newTerm) if newTerm >= currentTerm =>
+              timer.cancelAll()
+              follower(newTerm, None)
+            case Heartbeat(_) =>
+              Actor.same
+          }
         }
-      }
 
       Actor.deferred { ctx =>
         println(ctx.self + " became candidate")
@@ -127,7 +128,8 @@ object Raft {
       }
     }
 
-    val requiredConfirmations: Int = minimalMajority(nodes.size) - 1 /* one self vote */
+    val requiredConfirmations
+      : Int = minimalMajority(nodes.size) - 1 /* one self vote */
   }
 
   def minimalMajority(clusterSize: Int): Int =
@@ -145,7 +147,8 @@ object Raft {
 
   case class Heartbeat(term: Int) extends TermMessage
 
-  case class VoteRequest(candidate: ActorRef[Message], term: Int) extends TermMessage
+  case class VoteRequest(candidate: ActorRef[Message], term: Int)
+      extends TermMessage
 
   case class VoteResponse(term: Int) extends TermMessage
 

@@ -10,10 +10,12 @@ import scala.util.Try
 
 object ClusterTest {
 
-  implicit def systemFromContext(implicit ctx: ActorContext[_]): ActorSystem[_] =
+  implicit def systemFromContext(
+      implicit ctx: ActorContext[_]): ActorSystem[_] =
     ctx.system
 
-  implicit def testKitSettingsFromContext(implicit ctx: ActorContext[_]): TestKitSettings =
+  implicit def testKitSettingsFromContext(
+      implicit ctx: ActorContext[_]): TestKitSettings =
     TestKitSettings(ctx.system)
 
   def cluster(testcase: ActorContext[_] => Unit): Unit = {
