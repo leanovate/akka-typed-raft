@@ -1,8 +1,10 @@
-import ClusterTest._
-import Raft.{ClusterConfiguration, Message}
-import akka.typed.{ActorRef, Behavior}
+package de.leanovate.raft
+
 import akka.typed.scaladsl.{Actor, ActorContext, TimerScheduler}
 import akka.typed.testkit.scaladsl.TestProbe
+import akka.typed.{ActorRef, Behavior}
+import de.leanovate.raft.ClusterTest._
+import de.leanovate.raft.Raft.{ClusterConfiguration, Message}
 import org.scalacheck.Gen
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FlatSpec, Matchers}

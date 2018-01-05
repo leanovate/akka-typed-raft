@@ -1,3 +1,5 @@
+package de.leanovate.raft
+
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.typed.ActorSystem

@@ -1,3 +1,5 @@
+package de.leanovate.raft
+
 import akka.NotUsed
 import akka.typed.scaladsl.Actor
 import akka.typed.{ActorRef, Behavior}

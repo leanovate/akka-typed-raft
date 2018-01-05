@@ -1,5 +1,7 @@
-import ClusterTest._
+package de.leanovate.raft
+
 import akka.typed.testkit.scaladsl.TestProbe
+import de.leanovate.raft.ClusterTest._
 import org.scalatest.{FlatSpec, Matchers}
 
 class RegistryTest extends FlatSpec with Matchers {

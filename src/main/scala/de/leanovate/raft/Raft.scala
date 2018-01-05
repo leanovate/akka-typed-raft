@@ -1,8 +1,10 @@
+package de.leanovate.raft
+
 import akka.typed.scaladsl.{Actor, TimerScheduler}
 import akka.typed.{ActorRef, Behavior}
 
 import scala.annotation.tailrec
-import scala.concurrent.duration.{DurationLong, FiniteDuration}
+import scala.concurrent.duration._
 
 object Raft {
 
