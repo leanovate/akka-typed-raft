@@ -109,16 +109,9 @@ class RaftTest
       val node = TestProbe[Raft.Message]("node")
       val follower = ctx.spawn(newFollower(Set(node.ref), 1, None), "follower")
 
-      ctx.spawn(
-        Actor.withTimers[Unit] { timer =>
-          timer.startPeriodicTimer("", (), leaderHeartbeat)
-          Actor.immutable { (_, _) =>
-            follower ! Raft.Heartbeat(0)
-            Actor.same
-          }
-        },
-        "oldLeader"
-      )
+      ctx.schedule(1 * leaderHeartbeat, follower, Raft.Heartbeat(0))
+      ctx.schedule(2 * leaderHeartbeat, follower, Raft.Heartbeat(0))
+      ctx.schedule(3 * leaderHeartbeat, follower, Raft.Heartbeat(0))
 
       node.expectMsg(maximalFollowerTimeout * 2,
                      Raft.VoteRequest(follower, term = 2))
