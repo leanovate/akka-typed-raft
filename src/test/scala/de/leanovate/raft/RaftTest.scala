@@ -1,6 +1,6 @@
 package de.leanovate.raft
 
-import akka.typed.scaladsl.{Actor, ActorContext, TimerScheduler}
+import akka.typed.scaladsl.ActorContext
 import akka.typed.testkit.scaladsl.TestProbe
 import akka.typed.{ActorRef, Behavior}
 import de.leanovate.raft.ClusterTest._
@@ -23,32 +23,24 @@ class RaftTest
     .ensuring(_ < minimalFollowerTimeout)
   private val shortTime: FiniteDuration = 10.milliseconds
 
-  def testConfiguration(nodes: Set[ActorRef[Message]],
-                        timer: TimerScheduler[Message]) =
-    new ClusterConfiguration(nodes,
-                             timer,
-                             leaderHeartbeat,
-                             followerTimeout,
-                             candidateTimeout)
+  def testConfiguration(nodes: Set[ActorRef[Message]]) =
+    ClusterConfiguration(nodes,
+                         leaderHeartbeat,
+                         followerTimeout,
+                         candidateTimeout)
 
   def newLeader(nodes: Set[ActorRef[Message]],
-                currentTerm: Int): Behavior[Message] = Actor.withTimers {
-    timer =>
-      testConfiguration(nodes, timer).leader(currentTerm)
-  }
+                currentTerm: Int): Behavior[Message] =
+    Raft.startLeader(currentTerm)(testConfiguration(nodes))
 
   def newFollower(nodes: Set[ActorRef[Message]],
                   currentTerm: Int,
                   votedFor: Option[ActorRef[Message]]): Behavior[Message] =
-    Actor.withTimers { timer =>
-      testConfiguration(nodes, timer).follower(currentTerm, votedFor)
-    }
+    Raft.startFollower(currentTerm, votedFor)(testConfiguration(nodes))
 
   def newCandidate(nodes: Set[ActorRef[Message]],
-                   currentTerm: Int): Behavior[Message] = Actor.withTimers {
-    timer =>
-      testConfiguration(nodes, timer).candidate(currentTerm)
-  }
+                   currentTerm: Int): Behavior[Message] =
+    Raft.startCandidate(currentTerm)(testConfiguration(nodes))
 
   "leaders" should "send heartbeats regularly" in cluster { implicit ctx =>
     val follower = TestProbe[Raft.Message]("follower")
@@ -95,13 +87,13 @@ class RaftTest
   }
 
   it should "generate random timeouts in" in {
+    val config = testConfiguration(Set.empty)
+    val samples = Array.fill(2000)(Raft.randomFollowerTimeout()(config))
+
+    samples.min should be >= minimalFollowerTimeout
+    samples.max should be <= maximalFollowerTimeout
+
     withClue("this test has the very unlikely random chance to fail") {
-      val config = testConfiguration(Set.empty, null)
-      val samples = Array.fill(2000)(config.randomFollowerTimeout())
-
-      samples.min should be >= minimalFollowerTimeout
-      samples.max should be <= maximalFollowerTimeout
-
       (samples.max - samples.min) should be >= (maximalFollowerTimeout - minimalFollowerTimeout) * 0.8
     }
   }
