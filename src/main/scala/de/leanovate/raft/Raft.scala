@@ -8,14 +8,18 @@ import scala.concurrent.duration._
 
 object Raft {
 
-  def behavior: Behavior[Message] = Actor.withTimers { timer =>
-    new ClusterConfiguration(
-      Set.empty,
-      timer,
-      leaderHeartbeat = 200.milliseconds,
-      followerTimeout = 500.milliseconds -> 800.milliseconds,
-      candidateTimeout = 300.milliseconds).follower(0, None)
-  }
+  def behavior(
+      nodes: Set[ActorRef[Message]],
+      leaderHeartbeat: FiniteDuration = 200.milliseconds,
+      followerTimeout: (FiniteDuration, FiniteDuration) = 500.milliseconds -> 800.milliseconds,
+      candidateTimeout: FiniteDuration = 300.milliseconds): Behavior[Message] =
+    Actor.withTimers { timer =>
+      new ClusterConfiguration(nodes,
+                               timer,
+                               leaderHeartbeat,
+                               followerTimeout,
+                               candidateTimeout).follower(0, None)
+    }
 
   class ClusterConfiguration(nodes: Set[ActorRef[Message]],
                              timer: TimerScheduler[Message],
@@ -89,6 +93,8 @@ object Raft {
               resetTimer()
               candidate ! VoteResponse(newTerm)
               Actor.same
+            case VoteResponse(_) =>
+              Actor.same
           }
         }
       }
@@ -154,7 +160,7 @@ object Raft {
 
   case class VoteResponse(term: Int) extends TermMessage
 
-  case object Timeout extends Message
+  private[raft] case object Timeout extends Message
 
   val HeartbeatTick: Timeout.type = Timeout
   val LeaderTimeout: Timeout.type = Timeout

@@ -181,6 +181,11 @@ class RaftTest
       newLeaderPrope.expectNoMsg(shortTime)
   }
 
+  ignore should "ignore all vote responses" in cluster { implicit ctx =>
+    // how could this be tested?
+    fail()
+  }
+
   "candidates" should "become leaders when receiving vote responses from the majority" in cluster {
     implicit ctx =>
       val follower = fiveProbes
