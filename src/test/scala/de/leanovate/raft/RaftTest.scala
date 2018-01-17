@@ -32,17 +32,17 @@ class RaftTest
                          candidateTimeout)
 
   def newLeader(nodes: Set[ActorRef[Out.Message]],
-                currentTerm: Int): Behavior[In.Message] =
+                currentTerm: Int): Behavior[In.PrivateMessage] =
     Raft.startAsLeader(currentTerm)(testConfiguration(nodes))
 
   def newFollower(
       nodes: Set[ActorRef[Out.Message]],
       currentTerm: Int,
-      votedFor: Option[ActorRef[Out.Message]]): Behavior[In.Message] =
+      votedFor: Option[ActorRef[Out.Message]]): Behavior[In.PrivateMessage] =
     Raft.startAsFollower(currentTerm, votedFor)(testConfiguration(nodes))
 
   def newCandidate(nodes: Set[ActorRef[Out.Message]],
-                   currentTerm: Int): Behavior[In.Message] =
+                   currentTerm: Int): Behavior[In.PrivateMessage] =
     Raft.startAsCandidate(currentTerm)(testConfiguration(nodes))
 
   "leaders" should "send heartbeats regularly" in cluster { implicit ctx =>
