@@ -29,6 +29,8 @@ object VisServer {
     // keep fanoutPublisher alive
     Source.fromPublisher(fanoutPublisher).runWith(Sink.ignore)
 
+    Source.fromPublisher(fanoutPublisher).runWith(Sink.foreach(println))
+
     path("events") {
       get {
         import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
