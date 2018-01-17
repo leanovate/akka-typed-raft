@@ -6,6 +6,7 @@ import akka.typed.{ActorRef, Behavior}
 import de.leanovate.raft.ClusterTest._
 import de.leanovate.raft.Raft.{ClusterConfiguration, Message}
 import org.scalacheck.Gen
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -14,6 +15,7 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 class RaftTest
     extends FlatSpec
     with Matchers
+    with ScalaFutures
     with GeneratorDrivenPropertyChecks {
 
   private val leaderHeartbeat = 50.milliseconds
@@ -31,16 +33,16 @@ class RaftTest
 
   def newLeader(nodes: Set[ActorRef[Message]],
                 currentTerm: Int): Behavior[Message] =
-    Raft.startLeader(currentTerm)(testConfiguration(nodes))
+    Raft.startAsLeader(currentTerm)(testConfiguration(nodes))
 
   def newFollower(nodes: Set[ActorRef[Message]],
                   currentTerm: Int,
                   votedFor: Option[ActorRef[Message]]): Behavior[Message] =
-    Raft.startFollower(currentTerm, votedFor)(testConfiguration(nodes))
+    Raft.startAsFollower(currentTerm, votedFor)(testConfiguration(nodes))
 
   def newCandidate(nodes: Set[ActorRef[Message]],
                    currentTerm: Int): Behavior[Message] =
-    Raft.startCandidate(currentTerm)(testConfiguration(nodes))
+    Raft.startAsCandidate(currentTerm)(testConfiguration(nodes))
 
   "leaders" should "send heartbeats regularly" in cluster { implicit ctx =>
     val follower = TestProbe[Raft.Message]("follower")

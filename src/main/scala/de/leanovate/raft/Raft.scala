@@ -8,16 +8,19 @@ import scala.concurrent.duration._
 
 object Raft {
 
-  def startLeader(currentTerm: Int = 0)(
+  def behaviour(clusterConfiguration: ClusterConfiguration): Behavior[Message] =
+    startAsFollower()(clusterConfiguration)
+
+  def startAsLeader(currentTerm: Int = 0)(
       implicit config: ClusterConfiguration): Behavior[Message] =
     Actor.withTimers { leader(currentTerm)(config, _) }
 
-  def startFollower(currentTerm: Int = 0,
-                    votedFor: Option[ActorRef[Message]] = None)(
+  def startAsFollower(currentTerm: Int = 0,
+                      votedFor: Option[ActorRef[Message]] = None)(
       implicit config: ClusterConfiguration): Behavior[Message] =
     Actor.withTimers { follower(currentTerm, votedFor)(config, _) }
 
-  def startCandidate(currentTerm: Int = 0)(
+  def startAsCandidate(currentTerm: Int = 0)(
       implicit config: ClusterConfiguration): Behavior[Message] =
     Actor.withTimers { candidate(currentTerm)(config, _) }
 
@@ -90,7 +93,6 @@ object Raft {
       }
     }
   }
-
   @tailrec
   private[raft] final def randomFollowerTimeout()(
       implicit config: ClusterConfiguration): FiniteDuration = {
@@ -171,5 +173,4 @@ object Raft {
   private[raft] val HeartbeatTick: Timeout.type = Timeout
   private[raft] val LeaderTimeout: Timeout.type = Timeout
   private[raft] val CandidateTimeout: Timeout.type = Timeout
-
 }

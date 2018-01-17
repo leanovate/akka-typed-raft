@@ -15,14 +15,15 @@ object MonitoredNetwork {
 
       val names = (1 to 5).map("node" + _)
 
-      val adapters = names.map { name: String =>
+      val ambassadors = names.map { name: String =>
         ctx.spawnAdapter { msg: Raft.Message =>
           NetworkMessage(msg, name)
         }
       }.toSet
 
       val nodes = names
-        .map(name => name -> ctx.spawn(slowRaftBehavior(adapters), name))
+        .map(name =>
+          name -> ctx.spawn(Raft.behaviour(slowRaft(ambassadors)), name))
         .toMap
 
       Actor.immutable {
@@ -37,10 +38,10 @@ object MonitoredNetwork {
   private case class NetworkMessage(msg: Raft.Message, node: String)
       extends Messages
 
-  private def slowRaftBehavior(
-      nodes: Set[ActorRef[Message]]): Behavior[Raft.Message] =
-    Raft.behavior(nodes,
-                  leaderHeartbeat = 2.seconds,
-                  followerTimeout = 5.seconds -> 10.seconds,
-                  candidateTimeout = 3.seconds)
+  private def slowRaft(
+      nodes: Set[ActorRef[Message]]): Raft.ClusterConfiguration =
+    Raft.ClusterConfiguration(nodes,
+                              leaderHeartbeat = 2.seconds,
+                              followerTimeout = 5.seconds -> 10.seconds,
+                              candidateTimeout = 3.seconds)
 }
