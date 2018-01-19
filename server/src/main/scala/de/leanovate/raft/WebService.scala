@@ -1,7 +1,6 @@
 package de.leanovate.raft
 
 import akka.http.scaladsl.server.{Directives, Route}
-import de.leanovate.raft.shared.SharedMessages
 import de.leanovate.raft.twirl.Implicits._
 
 object WebService extends Directives {
@@ -10,7 +9,7 @@ object WebService extends Directives {
     pathSingleSlash {
       get {
         complete {
-          de.leanovate.raft.html.index.render(SharedMessages.itWorks)
+          de.leanovate.raft.html.index.render()
         }
       }
     } ~
