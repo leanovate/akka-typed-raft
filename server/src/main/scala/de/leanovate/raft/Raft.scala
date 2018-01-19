@@ -41,7 +41,7 @@ object Raft {
       timer: TimerScheduler[In.PrivateMessage]): Behavior[In.PrivateMessage] =
     Actor.deferred { ctx =>
       println(ctx.self + " became leader")
-      timer.startPeriodicTimer("", In.HeartbeatTick, 150.milliseconds)
+      timer.startPeriodicTimer("", In.HeartbeatTick, config.leaderHeartbeat)
       Actor.immutable { (_, msg) =>
         msg match {
           case In.HeartbeatTick =>
