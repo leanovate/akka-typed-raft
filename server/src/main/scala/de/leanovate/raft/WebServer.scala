@@ -8,7 +8,6 @@ import com.typesafe.config.ConfigFactory
 import de.leanovate.raft.vis.VisWebSerice
 
 import scala.concurrent.ExecutionContext
-import scala.io.StdIn
 
 object WebServer extends Directives {
   def main(args: Array[String]): Unit = {
@@ -23,12 +22,5 @@ object WebServer extends Directives {
     val bindingFuture = Http().bindAndHandle(VisWebSerice.routes ~ WebService.route, interface, port)
 
     println(s"Server online at http://$interface:$port")
-    println("Press RETURN to stop...")
-
-    StdIn.readLine()
-    bindingFuture
-      .flatMap(_.unbind())
-      .onComplete(_ => system.terminate())
-
   }
 }
