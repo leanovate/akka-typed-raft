@@ -1,5 +1,7 @@
 package de.leanovate.raft.vis
 
+import java.time.Clock
+
 import akka.typed.scaladsl.Actor
 import akka.typed.{ActorRef, Behavior}
 import de.leanovate.raft.Raft
@@ -8,9 +10,11 @@ import scala.concurrent.duration._
 
 object MonitoredNetwork {
 
-  def behaviour(sink: String => Unit): Behavior[Messages] =
+  def behaviour(sink: NetworkEvent => Unit, clock: Clock = Clock.systemUTC()): Behavior[Messages] =
     Actor.deferred[Messages] { ctx =>
       println("Started monitored network")
+
+      val startTime = clock.millis()
 
       val names = (1 to 5).map("node" + _)
 
@@ -31,11 +35,12 @@ object MonitoredNetwork {
 
       Actor.immutable {
         case (_, DelayedNetworkMessage(msg, from, to)) =>
-          sink(s"${msg.toString} from $from to $to")
 
           nodes(to) ! outToInMessage(ambassadorFor(to -> from))(msg)
           Actor.same
         case (ctx, NetworkMessage(msg, from, to)) =>
+          val relativeTime = (clock.millis() - startTime).toDouble / 1000
+          sink(MessageSent(from, to, relativeTime, Map("c" -> msg.toString)))
           ctx.schedule(500.milliseconds,
                        ctx.self,
                        DelayedNetworkMessage(msg, from, to))

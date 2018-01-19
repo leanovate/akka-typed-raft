@@ -6,6 +6,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{Materializer, OverflowStrategy}
+import upickle.default.write
 
 import scala.concurrent.duration._
 
@@ -15,12 +16,12 @@ object VisWebSerice {
     import akka.typed.scaladsl.adapter._
 
     val (queue, fanoutPublisher) = Source
-      .queue[String](10, OverflowStrategy.dropHead)
+      .queue[NetworkEvent](10, OverflowStrategy.dropHead)
       .toMat(Sink.asPublisher(fanout = true))(Keep.both)
       .run()
 
     sys.spawn[MonitoredNetwork.Messages](
-      MonitoredNetwork.behaviour(str => queue.offer(str)),
+      MonitoredNetwork.behaviour(queue.offer),
       "MonitoredNetwork")
 
     // keep fanoutPublisher alive
@@ -34,7 +35,7 @@ object VisWebSerice {
           complete {
             Source
               .fromPublisher(fanoutPublisher)
-              .map(time => ServerSentEvent(time.toString))
+              .map(event => ServerSentEvent(write(event)))
               .keepAlive(1.second, () => ServerSentEvent.heartbeat)
           }
         }

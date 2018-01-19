@@ -39,7 +39,12 @@ lazy val client = (project in file("client")).settings(
   dependsOn(sharedJs)
 
 lazy val shared = (crossProject.crossType(CrossType.Pure) in file("shared")).
-  settings(scalaVersion := scalaV)
+  settings(
+    scalaVersion := scalaV,
+    libraryDependencies ++= Seq(
+      "com.lihaoyi" %%% "upickle" % "0.5.1"
+    )
+  )
 
 lazy val sharedJvm = shared.jvm
 lazy val sharedJs = shared.js

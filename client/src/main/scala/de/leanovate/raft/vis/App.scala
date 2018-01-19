@@ -2,6 +2,7 @@ package de.leanovate.raft.vis
 
 import org.scalajs.dom
 import org.scalajs.dom._
+import upickle.default.read
 
 import scala.scalajs.js.JSApp
 import scala.scalajs.js.annotation.JSExportTopLevel
@@ -10,8 +11,9 @@ import scalatags.JsDom.all._
 @JSExportTopLevel("App")
 object App extends JSApp {
   // create a view for the counter
-  val messages = new MessageView(AppCircuit.zoom(_.messages), AppCircuit)
+  val messages = new MessageView(AppCircuit.zoom(_.networkEvents), AppCircuit)
   val nodes = new NodesView(AppCircuit.zoom(_.knowNodes), AppCircuit)
+  val slider = new SlideView(AppCircuit.zoom(_.networkEvents.headOption.map(_.secondsSinceStart).getOrElse(0.0)))
 
   @JSExportTopLevel("App.main")
   override def main(): Unit = {
@@ -25,7 +27,8 @@ object App extends JSApp {
     val source = new dom.EventSource("/vis/events")
 
     source.onmessage = { message: dom.MessageEvent =>
-      AppCircuit(NewMessage(message.data.toString))
+      if (message.data.toString.nonEmpty)
+        AppCircuit(NewEvent(read[NetworkEvent](message.data.toString)))
     }
 
     source.onerror = { _ =>
@@ -38,6 +41,7 @@ object App extends JSApp {
   private def render(root: Element) = {
     val e = div(
       h1("Raft-Visualisation"),
+      slider.render,
       nodes.render,
       messages.render
     ).render
