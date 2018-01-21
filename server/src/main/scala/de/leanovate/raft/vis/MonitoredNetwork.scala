@@ -5,24 +5,27 @@ import java.time.Clock
 import akka.typed.scaladsl.Actor
 import akka.typed.{ActorRef, Behavior}
 import de.leanovate.raft.Raft
+import de.leanovate.raft.Raft.Out
 
 import scala.concurrent.duration._
 
 object MonitoredNetwork {
 
   private val slowMessages = 500.milliseconds
-  private val slowRaft =
+  private val slowRaft: (Set[ActorRef[Out.Message]],
+                         ActorRef[String]) => Raft.ClusterConfiguration =
     Raft.ClusterConfiguration(_,
-      leaderHeartbeat = 2.seconds,
-      followerTimeout = 5.seconds -> 10.seconds,
-      candidateTimeout = 3.seconds)
+                              _,
+                              leaderHeartbeat = 2.seconds,
+                              followerTimeout = 5.seconds -> 10.seconds,
+                              candidateTimeout = 3.seconds)
 
-
-  def behaviour(sink: NetworkEvent => Unit, clock: Clock = Clock.systemUTC()): Behavior[Messages] =
+  def behaviour(sink: NetworkEvent => Unit,
+                clock: Clock = Clock.systemUTC()): Behavior[Messages] =
     Actor.deferred[Messages] { ctx =>
       println("Started monitored network")
 
-      val startTime = clock.millis()
+      def time() = clock.millis().toDouble / 1000
 
       val names = (1 to 5).map("node" + _)
 
@@ -38,20 +41,24 @@ object MonitoredNetwork {
         val ambassadors = ambassadorFor.collect {
           case ((`name`, notSelf), ambassador) if notSelf != name => ambassador
         }.toSet
-        name -> ctx.spawn(Raft.behaviour(slowRaft(ambassadors)), name)
+        val logger = ctx.spawnAdapter[String] { msg: String =>
+          NodeLogMessage(name, msg)
+        }
+        name -> ctx.spawn(Raft.behaviour(slowRaft(ambassadors, logger)), name)
       }.toMap
 
       Actor.immutable {
         case (_, DelayedNetworkMessage(msg, from, to)) =>
-
           nodes(to) ! outToInMessage(ambassadorFor(to -> from))(msg)
           Actor.same
         case (ctx, NetworkMessage(msg, from, to)) =>
-          val relativeTime = (clock.millis() - startTime).toDouble / 1000
-          sink(MessageSent(from, to, relativeTime, Map("c" -> msg.toString)))
+          sink(MessageSent(from, to, time(), Map("c" -> msg.toString)))
           ctx.schedule(slowMessages,
                        ctx.self,
                        DelayedNetworkMessage(msg, from, to))
+          Actor.same
+        case (_, NodeLogMessage(node, msg)) =>
+          sink(NodeUpdate(node, time(), Map("c" -> msg)))
           Actor.same
       }
     }
@@ -66,6 +73,7 @@ object MonitoredNetwork {
                                            from: String,
                                            to: String)
       extends Messages
+  private case class NodeLogMessage(node: String, msg: String) extends Messages
 
   private def outToInMessage(ambassador: ActorRef[Raft.Out.Message])
     : Raft.Out.Message => Raft.In.Message = {

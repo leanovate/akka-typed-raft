@@ -2,7 +2,7 @@ package de.leanovate.raft.vis
 import upickle.default._
 
 sealed trait NetworkEvent {
-  def secondsSinceStart: Double
+  def timeInSeconds: Double
 }
 
 object NetworkEvent {
@@ -11,13 +11,13 @@ object NetworkEvent {
 }
 
 //TODO: find a way to use java.time.Instant instead of secondsSinceStart
-final case class MessageSent(from: String, to: String, secondsSinceStart: Double, content: Map[String, String]) extends NetworkEvent
+final case class MessageSent(from: String, to: String, timeInSeconds: Double, content: Map[String, String]) extends NetworkEvent
 
 object MessageSent {
   implicit val messageSentRW: ReadWriter[MessageSent] = macroRW
 }
 
-final case class NodeUpdate(node: String, secondsSinceStart: Double, content: Map[String, String]) extends NetworkEvent
+final case class NodeUpdate(node: String, timeInSeconds: Double, content: Map[String, String]) extends NetworkEvent
 
 object NodeUpdate {
   implicit val nodeUpdateRW: ReadWriter[NodeUpdate] = macroRW

@@ -11,9 +11,21 @@ import scalatags.JsDom.all._
 @JSExportTopLevel("App")
 object App extends JSApp {
   // create a view for the counter
-  val messages = new MessageView(AppCircuit.zoom(_.networkEvents), AppCircuit)
-  val nodes = new NodesView(AppCircuit.zoom(_.knowNodes), AppCircuit.zoom(_.networkEvents))
-  val slider = new SlideView(AppCircuit.zoom(_.networkEvents.headOption.map(_.secondsSinceStart).getOrElse(0.0)))
+  val messages =
+    new MessageView(AppCircuit.zoom(_.networkEvents.take(50)), AppCircuit)
+  val nodes = new NodesView(AppCircuit.zoom(_.knowNodes),
+                            AppCircuit.zoom(_.networkEvents))
+  val slider = new SlideView(
+    AppCircuit.zoom(
+      _.networkEvents.headOption.map(_.timeInSeconds).getOrElse(0.0)))
+
+  def onlyLastState(seq: Seq[NetworkEvent]): Map[String, String] =
+    seq
+      .collect { case update: NodeUpdate => update }
+      .groupBy(_.node)
+      .mapValues(_.maxBy(_.timeInSeconds).content.toString())
+  val nodeOverview = new NodeOverview(
+    AppCircuit.zoom(rm => onlyLastState(rm.networkEvents)))
 
   @JSExportTopLevel("App.main")
   override def main(): Unit = {
@@ -42,6 +54,7 @@ object App extends JSApp {
     val e = div(
       h1("Raft-Visualisation"),
       slider.render,
+      nodeOverview.render,
       nodes.render,
       messages.render
     ).render

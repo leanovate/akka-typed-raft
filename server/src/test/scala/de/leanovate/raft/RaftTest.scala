@@ -13,7 +13,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class RaftTest
-    extends FlatSpec
+  extends FlatSpec
     with Matchers
     with ScalaFutures
     with GeneratorDrivenPropertyChecks {
@@ -25,24 +25,29 @@ class RaftTest
     .ensuring(_ < minimalFollowerTimeout)
   private val shortTime: FiniteDuration = 10.milliseconds
 
-  def testConfiguration(nodes: Set[ActorRef[Out.Message]]) =
+  def testConfiguration(nodes: Set[ActorRef[Out.Message]])(
+    implicit ctx: ActorContext[_]) =
     ClusterConfiguration(nodes,
-                         leaderHeartbeat,
-                         followerTimeout,
-                         candidateTimeout)
+      ctx.system.deadLetters,
+      leaderHeartbeat,
+      followerTimeout,
+      candidateTimeout)
 
   def newLeader(nodes: Set[ActorRef[Out.Message]],
-                currentTerm: Int): Behavior[In.PrivateMessage] =
+                currentTerm: Int)(
+                 implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
     Raft.startAsLeader(currentTerm)(testConfiguration(nodes))
 
   def newFollower(
-      nodes: Set[ActorRef[Out.Message]],
-      currentTerm: Int,
-      votedFor: Option[ActorRef[Out.Message]]): Behavior[In.PrivateMessage] =
+                   nodes: Set[ActorRef[Out.Message]],
+                   currentTerm: Int,
+                   votedFor: Option[ActorRef[Out.Message]])(
+                   implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
     Raft.startAsFollower(currentTerm, votedFor)(testConfiguration(nodes))
 
   def newCandidate(nodes: Set[ActorRef[Out.Message]],
-                   currentTerm: Int): Behavior[In.PrivateMessage] =
+                   currentTerm: Int)(
+                    implicit ctx: ActorContext[_]) : Behavior[In.PrivateMessage] =
     Raft.startAsCandidate(currentTerm)(testConfiguration(nodes))
 
   "leaders" should "send heartbeats regularly" in cluster { implicit ctx =>
@@ -88,7 +93,7 @@ class RaftTest
       node.expectMsg(maximalFollowerTimeout * 2, Raft.Out.VoteRequest(term = 2))
   }
 
-  it should "generate random timeouts in" in {
+  it should "generate random timeouts in" in cluster { implicit ctx =>
     val config = testConfiguration(Set.empty)
     val samples = Array.fill(2000)(Raft.randomFollowerTimeout()(config))
 
@@ -121,7 +126,7 @@ class RaftTest
       follower ! Raft.In.Heartbeat(term = 3)
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
-                          Raft.Out.VoteRequest(term = 4))
+        Raft.Out.VoteRequest(term = 4))
   }
 
   it should "restart its timer after being a candidate and reverting back to follower" in cluster {
@@ -133,12 +138,12 @@ class RaftTest
       follower ! Raft.In.Heartbeat(term = 3)
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
-                          Raft.Out.VoteRequest(term = 4))
+        Raft.Out.VoteRequest(term = 4))
 
       follower ! Raft.In.Heartbeat(term = 5)
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
-                          Raft.Out.VoteRequest(term = 6))
+        Raft.Out.VoteRequest(term = 6))
   }
 
   it should "vote for a legitimate new leader" in cluster { implicit ctx =>

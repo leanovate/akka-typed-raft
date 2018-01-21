@@ -28,6 +28,7 @@ object Raft {
 
   case class ClusterConfiguration(
       ambassadors: Set[ActorRef[Out.Message]],
+      logger: ActorRef[String],
       leaderHeartbeat: FiniteDuration,
       followerTimeout: (FiniteDuration, FiniteDuration),
       candidateTimeout: FiniteDuration) {
@@ -40,7 +41,7 @@ object Raft {
       implicit config: ClusterConfiguration,
       timer: TimerScheduler[In.PrivateMessage]): Behavior[In.PrivateMessage] =
     Actor.deferred { ctx =>
-      println(ctx.self + " became leader")
+      config.logger ! "became leader"
       timer.startPeriodicTimer("", In.HeartbeatTick, config.leaderHeartbeat)
       Actor.immutable { (_, msg) =>
         msg match {
@@ -70,7 +71,7 @@ object Raft {
 
     Actor.deferred { ctx =>
       resetTimer()
-      println(ctx.self + s" became follower in term $currentTerm")
+      config.logger ! s" became follower in term $currentTerm"
       Actor.immutable { (_, msg) =>
         msg match {
           case In.LeaderTimeout =>
@@ -104,8 +105,7 @@ object Raft {
     math.random() * span match {
       case offset: FiniteDuration => config.minimalFollowerTimeout + offset
       case unexpectedResult =>
-        println(
-          s"Got $unexpectedResult during timeout generation, trying again")
+        config.logger ! s"Got $unexpectedResult during timeout generation, trying again"
         randomFollowerTimeout()
     }
   }
@@ -130,7 +130,7 @@ object Raft {
           case In.VoteResponse(_) =>
             Actor.same
           case In.CandidateTimeout =>
-            println(ctx.self + " candidate timeout, start new term")
+            config.logger ! "candidate timeout, start new term"
             candidate(currentTerm + 1)
           case In.Message(newTerm) if newTerm >= currentTerm =>
             timer.cancelAll()
@@ -141,7 +141,7 @@ object Raft {
       }
 
     Actor.deferred { ctx =>
-      println(s"${ctx.self} became candidate in term $currentTerm")
+      config.logger ! s"candidate in term $currentTerm"
       config.ambassadors.foreach(_ ! Out.VoteRequest(currentTerm))
 
       val requiredConfirmations: Int =

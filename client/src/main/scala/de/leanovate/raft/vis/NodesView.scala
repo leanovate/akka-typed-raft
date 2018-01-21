@@ -7,9 +7,8 @@ import scalatags.JsDom.svgTags._
 import scalatags.JsDom.all.{SeqFrag, _}
 import scalatags.JsDom.svgAttrs.{style, _}
 
-
-class NodesView(nodes: ModelRO[Set[String]], messsages: ModelRO[Seq[NetworkEvent]]) {
-
+class NodesView(nodes: ModelRO[Set[String]],
+                messsages: ModelRO[Seq[NetworkEvent]]) {
 
   def render: JsDom.Frag = {
     val sortedNodes = nodes().toSeq.sorted
@@ -24,7 +23,9 @@ class NodesView(nodes: ModelRO[Set[String]], messsages: ModelRO[Seq[NetworkEvent
       (x2, y2) = nodePositions(to)
     } yield ((x1 + x2) / 2, (y1 + y2) / 2)
 
-    svg(viewBox := "-50 -50 100 100", style := "max-width: 500px",
+    svg(
+      viewBox := "-50 -50 100 100",
+      style := "max-width: 500px",
       for {
         (node, (nx, ny)) <- nodePositions.toSeq
       } yield circle(cx := nx, cy := ny, r := 5, fill := "yellow"),

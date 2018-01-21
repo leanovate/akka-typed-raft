@@ -3,7 +3,9 @@ package de.leanovate.raft.vis
 import diode._
 
 // Define the root of our application model
-case class RootModel(networkEvents: Seq[NetworkEvent], knowNodes: Set[String], lifeTime: Double)
+case class RootModel(networkEvents: Seq[NetworkEvent],
+                     knowNodes: Set[String],
+                     lifeTime: Double)
 
 // Define actions
 case class NewEvent(event: NetworkEvent) extends Action
@@ -20,14 +22,11 @@ object AppCircuit extends Circuit[RootModel] {
 
   private val lastMessages = new ActionHandler(zoomTo(_.networkEvents)) {
     override def handle = {
-      case NewEvent(msg) => updated((msg +: value).take(20))
+      case NewEvent(msg) => updated((msg +: value).take(500))
     }
   }
 
   private val knownNodes = new ActionHandler(zoomTo(_.knowNodes)) {
-    val OneName = """.*(node\d).*""".r
-    val TwoNames = """.*(node\d).*(node\d).*""".r
-
     override def handle = {
       case NewEvent(MessageSent(from, to, _, _)) =>
         updated(value + from + to)
