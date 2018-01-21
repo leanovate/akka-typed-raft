@@ -170,13 +170,13 @@ class RaftTest
 
   it should "not respond to vote requests from old terms" in cluster {
     implicit ctx =>
-      val newLeaderPrope = TestProbe[Raft.Out.Message]("newLeader")
+      val newLeaderProbe = TestProbe[Raft.Out.Message]("newLeader")
       val follower =
-        ctx.spawn(newFollower(Set(newLeaderPrope.ref), 2, None), "follower")
+        ctx.spawn(newFollower(Set(newLeaderProbe.ref), 2, None), "follower")
 
-      follower ! Raft.In.VoteRequest(newLeaderPrope.ref, term = 1)
+      follower ! Raft.In.VoteRequest(newLeaderProbe.ref, term = 1)
 
-      newLeaderPrope.expectNoMsg(shortTime)
+      newLeaderProbe.expectNoMsg(shortTime)
   }
 
   ignore should "ignore all vote responses" in cluster { implicit ctx =>
@@ -237,7 +237,6 @@ class RaftTest
 
   it should "become a follower if a heartbeat is received" in cluster {
     implicit ctx =>
-      val newLeader = TestProbe[Raft.Out.Message]("newLeader")
       val follower = fiveProbes
       val followerActors = follower.map(_.ref)
       val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
@@ -273,7 +272,6 @@ class RaftTest
   }
 
   it should "ignore old heartbeats" in cluster { implicit ctx =>
-    val newLeader = TestProbe[Raft.Out.Message]("newLeader")
     val follower = fiveProbes
     val followerActors = follower.map(_.ref)
     val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
