@@ -13,7 +13,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class RaftTest
-  extends FlatSpec
+    extends FlatSpec
     with Matchers
     with ScalaFutures
     with GeneratorDrivenPropertyChecks {
@@ -26,28 +26,25 @@ class RaftTest
   private val shortTime: FiniteDuration = 10.milliseconds
 
   def testConfiguration(nodes: Set[ActorRef[Out.Message]])(
-    implicit ctx: ActorContext[_]) =
+      implicit ctx: ActorContext[_]) =
     ClusterConfiguration(nodes,
-      ctx.system.deadLetters,
-      leaderHeartbeat,
-      followerTimeout,
-      candidateTimeout)
+                         ctx.system.deadLetters,
+                         leaderHeartbeat,
+                         followerTimeout,
+                         candidateTimeout)
 
-  def newLeader(nodes: Set[ActorRef[Out.Message]],
-                currentTerm: Int)(
-                 implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
+  def newLeader(nodes: Set[ActorRef[Out.Message]], currentTerm: Int)(
+      implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
     Raft.startAsLeader(currentTerm)(testConfiguration(nodes))
 
-  def newFollower(
-                   nodes: Set[ActorRef[Out.Message]],
-                   currentTerm: Int,
-                   votedFor: Option[ActorRef[Out.Message]])(
-                   implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
+  def newFollower(nodes: Set[ActorRef[Out.Message]],
+                  currentTerm: Int,
+                  votedFor: Option[ActorRef[Out.Message]])(
+      implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
     Raft.startAsFollower(currentTerm, votedFor)(testConfiguration(nodes))
 
-  def newCandidate(nodes: Set[ActorRef[Out.Message]],
-                   currentTerm: Int)(
-                    implicit ctx: ActorContext[_]) : Behavior[In.PrivateMessage] =
+  def newCandidate(nodes: Set[ActorRef[Out.Message]], currentTerm: Int)(
+      implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
     Raft.startAsCandidate(currentTerm)(testConfiguration(nodes))
 
   "leaders" should "send heartbeats regularly" in cluster { implicit ctx =>
@@ -126,7 +123,7 @@ class RaftTest
       follower ! Raft.In.Heartbeat(term = 3)
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
-        Raft.Out.VoteRequest(term = 4))
+                          Raft.Out.VoteRequest(term = 4))
   }
 
   it should "restart its timer after being a candidate and reverting back to follower" in cluster {
@@ -138,12 +135,12 @@ class RaftTest
       follower ! Raft.In.Heartbeat(term = 3)
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
-        Raft.Out.VoteRequest(term = 4))
+                          Raft.Out.VoteRequest(term = 4))
 
       follower ! Raft.In.Heartbeat(term = 5)
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
-        Raft.Out.VoteRequest(term = 6))
+                          Raft.Out.VoteRequest(term = 6))
   }
 
   it should "vote for a legitimate new leader" in cluster { implicit ctx =>
@@ -237,20 +234,15 @@ class RaftTest
 
   it should "become a follower if a heartbeat is received" in cluster {
     implicit ctx =>
-      val follower = fiveProbes
-      val followerActors = follower.map(_.ref)
-      val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
-
-      follower.foreach {
-        _.expectMsg(Raft.Out.VoteRequest(term = 2))
-      }
+      val follower = TestProbe[Raft.Out.Message]("node")
+      val candidate = ctx.spawn(newCandidate(Set(follower.ref), 2), "candidate")
 
       candidate ! Raft.In.Heartbeat(2)
 
-      follower.par.foreach { f =>
-        f.expectNoMsg(candidateTimeout)
-        f.expectMsg(maximalFollowerTimeout, Raft.Out.VoteRequest(term = 3))
-      }
+      follower.expectMsg(Raft.Out.VoteRequest(term = 2))
+
+      follower.expectNoMsg(candidateTimeout)
+      follower.expectMsg(maximalFollowerTimeout, Raft.Out.VoteRequest(term = 3))
   }
 
   it should "become a follower if a vote request with a more recent term is received" in cluster {
