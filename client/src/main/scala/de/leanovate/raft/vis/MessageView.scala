@@ -11,12 +11,7 @@ class MessageView(events: ModelRO[Seq[NetworkEvent]], dispatch: Dispatcher) {
       h2("Received messages:"),
       events().map { msg =>
         p(msg.toString)
-      },
-      div(
-        button(cls := "btn btn-default",
-               onclick := (() => dispatch(Reset)),
-               "Reset")
-      )
+      }
     )
   }
 }
