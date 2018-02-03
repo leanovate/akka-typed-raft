@@ -34,7 +34,6 @@ object App extends JSApp {
     // subscribe to changes in the application model and call render when anything changes
     AppCircuit.subscribe(AppCircuit.zoom(identity))(_ => render(root))
     // start the application by dispatching a Reset action
-    AppCircuit(Reset)
 
     val source = new dom.EventSource("/vis/events")
 
