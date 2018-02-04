@@ -11,14 +11,14 @@ import scala.concurrent.duration._
 
 object MonitoredNetwork {
 
-  private val slowMessages = 500.milliseconds
+  private val slowMessages = 1.second
   private val slowRaft: (Set[ActorRef[Out.Message]],
                          ActorRef[String]) => Raft.ClusterConfiguration =
     Raft.ClusterConfiguration(_,
                               _,
-                              leaderHeartbeat = 2.seconds,
+                              leaderHeartbeat = 3.seconds,
                               followerTimeout = 5.seconds -> 10.seconds,
-                              candidateTimeout = 3.seconds)
+                              candidateTimeout = 4.seconds)
 
   def behaviour(sink: NetworkEvent => Unit,
                 clock: Clock = Clock.systemUTC()): Behavior[Messages] =
@@ -52,7 +52,12 @@ object MonitoredNetwork {
           nodes(to) ! outToInMessage(ambassadorFor(to -> from))(msg)
           Actor.same
         case (ctx, NetworkMessage(msg, from, to)) =>
-          sink(MessageSent(from, to, time(), Map("c" -> msg.toString)))
+          sink(
+            MessageSent(from,
+                        to,
+                        time(),
+                        time() + slowMessages.toMillis.toDouble / 1000.0,
+                        Map("c" -> msg.toString)))
           ctx.schedule(slowMessages,
                        ctx.self,
                        DelayedNetworkMessage(msg, from, to))

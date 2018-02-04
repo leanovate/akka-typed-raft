@@ -5,32 +5,58 @@ import diode._
 // Define the root of our application model
 case class RootModel(networkEvents: Seq[NetworkEvent],
                      knowNodes: Set[String],
-                     lifeTime: Double)
+                     currentTime: Double)
 
 // Define actions
 case class NewEvent(event: NetworkEvent) extends Action
+
+case object Tick extends Action
 
 /**
   * AppCircuit provides the actual instance of the `RootModel` and all the action
   * handlers we need. Everything else comes from the `Circuit`
   */
 object AppCircuit extends Circuit[RootModel] {
-  // define initial value for the application model
+
   protected def initialModel = RootModel(Seq.empty, Set.empty, 0)
 
   private val lastMessages = new ActionHandler(zoomTo(_.networkEvents)) {
     override val handle = {
-      case NewEvent(msg) => updated((msg +: value).take(500))
+      case NewEvent(msg) =>
+        updated((msg +: value).take(300))
     }
   }
 
   private val knownNodes = new ActionHandler(zoomTo(_.knowNodes)) {
     override val handle = {
-      case NewEvent(MessageSent(from, to, _, _)) =>
+      case NewEvent(MessageSent(from, to, _, _, _))
+          if !value.contains(from) || !value.contains(to) =>
         updated(value + from + to)
     }
   }
 
+  private def alwaysUpdate[T](modelRW: ModelRW[RootModel, T])(
+      f: PartialFunction[(Any, T), T]) =
+    new ActionHandler[RootModel, T](modelRW) {
+      override protected def handle =
+        new PartialFunction[Any, ActionResult[RootModel]] {
+          override def isDefinedAt(event: Any) = f.isDefinedAt((event, value))
+
+          override def apply(event: Any) = updated(f((event, value)))
+        }
+    }
+
+  private[vis] val updateTime: PartialFunction[(Any, Double), Double] = {
+    case (NewEvent(msg), _) =>
+      msg.sendTime
+    case (Tick, time) =>
+      time + 0.02
+  }
+
   protected override val actionHandler: HandlerFunction =
-    foldHandlers(lastMessages, knownNodes)
+    foldHandlers(
+      lastMessages,
+      knownNodes,
+      alwaysUpdate(zoomTo(_.currentTime))(updateTime)
+    )
 }
