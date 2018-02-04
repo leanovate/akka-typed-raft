@@ -33,8 +33,10 @@ lazy val client = (project in file("client")).settings(
   libraryDependencies ++= Seq(
     "org.scala-js" %%% "scalajs-dom" % "0.9.3",
     "io.suzaku" %%% "diode" % "1.1.3",
-    "com.lihaoyi" %%% "scalatags" % "0.6.7"
-  )
+    "com.lihaoyi" %%% "scalatags" % "0.6.7",
+    "org.scalatest" %%% "scalatest" % "3.0.4" % Test,
+    "org.scalacheck" %%% "scalacheck" % "1.13.5" % Test
+)
 ).enablePlugins(ScalaJSPlugin, ScalaJSWeb).
   dependsOn(sharedJs)
 
