@@ -17,8 +17,9 @@ private[vis] class MemoryStore[E] {
   }
 
   def out: Source[E, NotUsed] = Source.unfoldAsync(first) { future =>
-    future.map { case (pro, e) =>
-      Some(pro.future.asInstanceOf[Future[(Promise[_], E)]] -> e)
+    future.map {
+      case (pro, e) =>
+        Some(pro.future.asInstanceOf[Future[(Promise[_], E)]] -> e)
     }
   }
 

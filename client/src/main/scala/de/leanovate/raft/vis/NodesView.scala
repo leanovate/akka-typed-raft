@@ -8,12 +8,12 @@ import scalatags.JsDom.all.{SeqFrag, _}
 import scalatags.JsDom.svgAttrs.{style, _}
 
 class NodesView(seconds: ModelRO[Double],
-                nodes: ModelRO[Set[String]],
+                nodes: ModelRO[Set[NodeName]],
                 messages: ModelRO[Seq[NetworkEvent]]) {
 
   def render: JsDom.Frag = {
     val sortedNodes = nodes().toSeq.sorted
-    val nodePositions: Map[String, (Double, Double)] =
+    val nodePositions: Map[NodeName, (Double, Double)] =
       NodesView.nodePositions(sortedNodes)
 
     val currentTime = seconds()

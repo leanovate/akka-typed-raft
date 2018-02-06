@@ -4,7 +4,7 @@ import diode._
 
 // Define the root of our application model
 case class RootModel(networkEvents: Seq[NetworkEvent],
-                     knowNodes: Set[String],
+                     knowNodes: Set[NodeName],
                      currentTime: Double)
 
 // Define actions

@@ -27,7 +27,7 @@ object MonitoredNetwork {
 
       def time() = clock.millis().toDouble / 1000
 
-      val names = (1 to 5).map("node" + _)
+      val names = (1 to 5).map(index => NodeName("node" + index))
 
       val ambassadorFor = (for {
         from <- names
@@ -44,7 +44,8 @@ object MonitoredNetwork {
         val logger = ctx.spawnAdapter[String] { msg: String =>
           NodeLogMessage(name, msg)
         }
-        name -> ctx.spawn(Raft.behaviour(slowRaft(ambassadors, logger)), name)
+        name -> ctx.spawn(Raft.behaviour(slowRaft(ambassadors, logger)),
+                          name.name)
       }.toMap
 
       Actor.immutable {
@@ -71,14 +72,15 @@ object MonitoredNetwork {
   sealed trait Messages
 
   private case class NetworkMessage(msg: Raft.Out.Message,
-                                    from: String,
-                                    to: String)
+                                    form: NodeName,
+                                    to: NodeName)
       extends Messages
   private case class DelayedNetworkMessage(msg: Raft.Out.Message,
-                                           from: String,
-                                           to: String)
+                                           from: NodeName,
+                                           to: NodeName)
       extends Messages
-  private case class NodeLogMessage(node: String, msg: String) extends Messages
+  private case class NodeLogMessage(node: NodeName, msg: String)
+      extends Messages
 
   private def outToInMessage(ambassador: ActorRef[Raft.Out.Message])
     : Raft.Out.Message => Raft.In.Message = {

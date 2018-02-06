@@ -10,7 +10,13 @@ class AppCircuitTest extends FlatSpec with Matchers {
     val givenTime = 1200.0
 
     val newTime =
-      updateTime(NewEvent(MessageSent("", "", givenTime, 1300.0, Map.empty)), 0)
+      updateTime(NewEvent(
+                   MessageSent(NodeName(""),
+                               NodeName(""),
+                               givenTime,
+                               1300.0,
+                               Map.empty)),
+                 0)
 
     newTime should be(givenTime)
   }

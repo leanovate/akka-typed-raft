@@ -19,7 +19,7 @@ object App extends JSApp {
 
   val timeView = new TimeView(AppCircuit.zoom(_.currentTime))
 
-  def onlyLastState(seq: Seq[NetworkEvent]): Map[String, String] =
+  def onlyLastState(seq: Seq[NetworkEvent]): Map[NodeName, String] =
     seq
       .collect { case update: NodeUpdate => update }
       .groupBy(_.node)
