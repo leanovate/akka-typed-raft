@@ -12,10 +12,11 @@ import scalatags.JsDom.all._
 object App extends JSApp {
   // create a view for the counter
   val messages =
-    new MessageView(AppCircuit.zoom(_.networkEvents.take(50)), AppCircuit)
+    new MessageView(AppCircuit.zoom(_.networkEvents))
   val nodes = new NodesView(AppCircuit.zoom(_.currentTime),
                             AppCircuit.zoom(_.knowNodes),
-                            AppCircuit.zoom(_.networkEvents))
+                            AppCircuit.zoom(_.networkEvents),
+                          AppCircuit)
 
   val timeView = new TimeView(AppCircuit.zoom(_.currentTime))
 
@@ -26,6 +27,7 @@ object App extends JSApp {
       .mapValues(_.maxBy(_.sendTime).content.toString())
 
   val nodeOverview = new NodeOverview(
+    AppCircuit.zoom(_.selected),
     AppCircuit.zoom(rm => onlyLastState(rm.networkEvents)))
 
   @JSExportTopLevel("App.main")

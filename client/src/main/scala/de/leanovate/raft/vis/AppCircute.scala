@@ -5,10 +5,13 @@ import diode._
 // Define the root of our application model
 case class RootModel(networkEvents: Seq[NetworkEvent],
                      knowNodes: Set[NodeName],
+                     selected: Option[NodeName],
                      currentTime: Double)
 
 // Define actions
 case class NewEvent(event: NetworkEvent) extends Action
+
+case class SelectNode(node: NodeName) extends Action
 
 case object Tick extends Action
 
@@ -18,12 +21,12 @@ case object Tick extends Action
   */
 object AppCircuit extends Circuit[RootModel] {
 
-  protected def initialModel = RootModel(Seq.empty, Set.empty, 0)
+  protected def initialModel = RootModel(Seq.empty, Set.empty, None, 0)
 
   private val lastMessages = new ActionHandler(zoomTo(_.networkEvents)) {
     override val handle = {
       case NewEvent(msg) =>
-        updated((msg +: value).take(300))
+        updated((msg +: value).take(50))
     }
   }
 
@@ -46,17 +49,24 @@ object AppCircuit extends Circuit[RootModel] {
         }
     }
 
-  private[vis] val updateTime: PartialFunction[(Any, Double), Double] = {
+  type Reducer[T] = PartialFunction[(Any, T), T]
+
+  private[vis] val updateTime: Reducer[Double] = {
     case (NewEvent(msg), _) =>
       msg.sendTime
     case (Tick, time) =>
       time + 0.02
   }
 
+  private[vis] val updateSelection: Reducer[Option[NodeName]] = {
+    case (SelectNode(name), _) => Some(name)
+  }
+
   protected override val actionHandler: HandlerFunction =
     foldHandlers(
       lastMessages,
       knownNodes,
-      alwaysUpdate(zoomTo(_.currentTime))(updateTime)
+      alwaysUpdate(zoomTo(_.currentTime))(updateTime),
+      alwaysUpdate(zoomTo(_.selected))(updateSelection)
     )
 }

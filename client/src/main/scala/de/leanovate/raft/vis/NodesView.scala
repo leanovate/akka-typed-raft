@@ -9,7 +9,8 @@ import scalatags.JsDom.svgAttrs.{style, _}
 
 class NodesView(seconds: ModelRO[Double],
                 nodes: ModelRO[Set[NodeName]],
-                messages: ModelRO[Seq[NetworkEvent]]) {
+                messages: ModelRO[Seq[NetworkEvent]],
+                dispatch: Dispatcher) {
 
   def render: JsDom.Frag = {
     val sortedNodes = nodes().toSeq.sorted
@@ -31,7 +32,7 @@ class NodesView(seconds: ModelRO[Double],
       style := "max-width: 500px",
       for {
         (node, (nx, ny)) <- nodePositions.toSeq
-      } yield circle(cx := nx, cy := ny, r := 5, fill := "yellow"),
+      } yield circle(cx := nx, cy := ny, r := 5, fill := "yellow", onmousedown := (() => dispatch(SelectNode(node)))),
       for {
         (x, y) <- messagePositions
       } yield circle(cx := x, cy := y, r := 2, fill := "orange")
