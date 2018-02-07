@@ -137,6 +137,8 @@ object Raft {
             follower(newTerm, None)
           case In.Heartbeat(_) =>
             Actor.same
+          case _: In.VoteRequest =>
+            Actor.same
         }
       }
 
