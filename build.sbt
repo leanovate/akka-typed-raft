@@ -2,13 +2,14 @@ version := "0.1"
 
 val scalaV = "2.12.4"
 
+scalaVersion in ThisBuild := "2.12.4"
+
 val akkaVersion = "2.5.8"
 
 scalafmtTestOnCompile in ThisBuild := true
 scalafmtFailTest in ThisBuild := false
 
 lazy val server = (project in file("server")).settings(
-  scalaVersion := scalaV,
   scalaJSProjects := Seq(client),
   pipelineStages in Assets := Seq(scalaJSPipeline),
   // triggers scalaJSPipeline when using compile or continuous compilation
@@ -17,9 +18,9 @@ lazy val server = (project in file("server")).settings(
     "com.typesafe.akka" %% "akka-typed" % akkaVersion,
     "com.typesafe.akka" %% "akka-typed-testkit" % akkaVersion % Test,
     "com.typesafe.akka" %% "akka-http" % "10.0.10",
-    "com.vmunier" %% "scalajs-scripts" % "1.1.0",
+    "com.vmunier" %% "scalajs-scripts" % "1.1.1",
     "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-    "org.scalatest" %% "scalatest" % "3.0.4" % Test,
+    "org.scalatest" %% "scalatest" % "3.0.5" % Test,
     "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
   ),
   WebKeys.packagePrefix in Assets := "public/",
@@ -28,13 +29,12 @@ lazy val server = (project in file("server")).settings(
   dependsOn(sharedJvm)
 
 lazy val client = (project in file("client")).settings(
-  scalaVersion := scalaV,
   scalaJSUseMainModuleInitializer := true,
   libraryDependencies ++= Seq(
-    "org.scala-js" %%% "scalajs-dom" % "0.9.3",
+    "org.scala-js" %%% "scalajs-dom" % "0.9.4",
     "io.suzaku" %%% "diode" % "1.1.3",
     "com.lihaoyi" %%% "scalatags" % "0.6.7",
-    "org.scalatest" %%% "scalatest" % "3.0.4" % Test,
+    "org.scalatest" %%% "scalatest" % "3.0.5" % Test,
     "org.scalacheck" %%% "scalacheck" % "1.13.5" % Test
 )
 ).enablePlugins(ScalaJSPlugin, ScalaJSWeb).
@@ -42,7 +42,6 @@ lazy val client = (project in file("client")).settings(
 
 lazy val shared = (crossProject.crossType(CrossType.Pure) in file("shared")).
   settings(
-    scalaVersion := scalaV,
     libraryDependencies ++= Seq(
       "com.lihaoyi" %%% "upickle" % "0.5.1"
     )
@@ -53,4 +52,3 @@ lazy val sharedJs = shared.js
 
 // loads the server project at sbt startup
 onLoad in Global := (onLoad in Global).value andThen { s: State => "project server" :: s }
-

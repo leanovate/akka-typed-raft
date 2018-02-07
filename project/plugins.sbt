@@ -5,8 +5,10 @@ addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.5")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.2.2")
 
-addSbtPlugin("org.scala-js" % "sbt-scalajs" % "0.6.20")
+addSbtPlugin("org.scala-js" % "sbt-scalajs" % "0.6.22")
 
 addSbtPlugin("com.vmunier" % "sbt-web-scalajs" % "1.0.6")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-twirl" % "1.3.12")
+
+addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.15")
