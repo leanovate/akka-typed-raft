@@ -32,7 +32,12 @@ class NodesView(seconds: ModelRO[Double],
       style := "max-width: 500px",
       for {
         (node, (nx, ny)) <- nodePositions.toSeq
-      } yield circle(cx := nx, cy := ny, r := 5, fill := "yellow", onmousedown := (() => dispatch(SelectNode(node)))),
+      } yield
+        circle(cx := nx,
+               cy := ny,
+               r := 5,
+               fill := "yellow",
+               onmousedown := (() => dispatch(SelectNode(node)))),
       for {
         (x, y) <- messagePositions
       } yield circle(cx := x, cy := y, r := 2, fill := "orange")

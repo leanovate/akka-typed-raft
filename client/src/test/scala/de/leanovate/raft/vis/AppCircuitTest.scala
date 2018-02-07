@@ -3,8 +3,20 @@ package de.leanovate.raft.vis
 import de.leanovate.raft.vis.AppCircuit.updateTime
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
+import org.scalatest.prop.PropertyChecks
 
-class AppCircuitTest extends FlatSpec with Matchers {
+class AppCircuitTest extends FlatSpec with Matchers with PropertyChecks {
+
+  "Known nodes" should "add unknown nodes from NodeUpdates" in {
+    forAll { (nodeUpdate: NodeUpdate, nodes: Set[NodeName]) =>
+      whenever(!nodes.contains(nodeUpdate.node)) {
+
+        val result = AppCircuit.knownNodes((NewEvent(nodeUpdate), nodes))
+        result should contain(nodeUpdate.node)
+
+      }
+    }
+  }
 
   "UpdateTimer" should "use the time given by events" in {
     val givenTime = 1200.0

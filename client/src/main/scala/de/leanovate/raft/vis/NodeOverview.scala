@@ -4,10 +4,12 @@ import diode.ModelRO
 
 import scalatags.JsDom.all._
 
-class NodeOverview(selected: ModelRO[Option[NodeName]], nodesView: ModelRO[Map[NodeName, String]]) {
+class NodeOverview(selected: ModelRO[Option[NodeName]],
+                   nodesView: ModelRO[Map[NodeName, String]]) {
 
-  def render = selected()
-    .fold(nothingSelected)(node => showNode(node, nodesView()(node)))
+  def render =
+    selected()
+      .fold(nothingSelected)(node => showNode(node, nodesView()(node)))
 
   private def nothingSelected = div(
     h3("Nothing selected"),

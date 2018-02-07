@@ -30,14 +30,6 @@ object AppCircuit extends Circuit[RootModel] {
     }
   }
 
-  private val knownNodes = new ActionHandler(zoomTo(_.knowNodes)) {
-    override val handle = {
-      case NewEvent(MessageSent(from, to, _, _, _))
-          if !value.contains(from) || !value.contains(to) =>
-        updated(value + from + to)
-    }
-  }
-
   private def alwaysUpdate[T](modelRW: ModelRW[RootModel, T])(
       f: PartialFunction[(Any, T), T]) =
     new ActionHandler[RootModel, T](modelRW) {
@@ -50,6 +42,14 @@ object AppCircuit extends Circuit[RootModel] {
     }
 
   type Reducer[T] = PartialFunction[(Any, T), T]
+
+  private[vis] val knownNodes: Reducer[Set[NodeName]] = {
+    case (NewEvent(MessageSent(from, to, _, _, _)), nodes)
+        if !nodes.contains(from) || !nodes.contains(to) =>
+      nodes + from + to
+    case (NewEvent(NodeUpdate(node, _, _)), nodes) if !nodes.contains(node) =>
+      nodes + node
+  }
 
   private[vis] val updateTime: Reducer[Double] = {
     case (NewEvent(msg), _) =>
@@ -65,7 +65,7 @@ object AppCircuit extends Circuit[RootModel] {
   protected override val actionHandler: HandlerFunction =
     foldHandlers(
       lastMessages,
-      knownNodes,
+      alwaysUpdate(zoomTo(_.knowNodes))(knownNodes),
       alwaysUpdate(zoomTo(_.currentTime))(updateTime),
       alwaysUpdate(zoomTo(_.selected))(updateSelection)
     )

@@ -16,7 +16,7 @@ object App extends JSApp {
   val nodes = new NodesView(AppCircuit.zoom(_.currentTime),
                             AppCircuit.zoom(_.knowNodes),
                             AppCircuit.zoom(_.networkEvents),
-                          AppCircuit)
+                            AppCircuit)
 
   val timeView = new TimeView(AppCircuit.zoom(_.currentTime))
 
