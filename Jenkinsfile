@@ -3,7 +3,7 @@ pipeline {
   stages {
     stage('Unit Test') {
       steps {
-        sh 'sbt test'
+        sh '/var/jenkins_home/bin/sbt test'
       }
     }
   }
