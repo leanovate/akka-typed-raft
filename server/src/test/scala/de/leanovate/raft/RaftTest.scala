@@ -69,7 +69,7 @@ class RaftTest
 
   it should "ignore vote request for the current and older terms" in cluster {
     implicit ctx =>
-      val oldCandidate = TestProbe[Raft.Out.Message]("node")
+      val oldCandidate = TestProbe[Raft.Out.Message]("oldCandidate")
       val leader =
         ctx.spawn(newLeader(Set(oldCandidate.ref), currentTerm = 2), "leader")
 
@@ -85,7 +85,7 @@ class RaftTest
   "followers" should "send vote request if a timeout happens" in cluster {
     implicit ctx =>
       val node = TestProbe[Raft.Out.Message]("node")
-      val follower = ctx.spawn(newFollower(Set(node.ref), 1, None), "follower")
+      ctx.spawn(newFollower(Set(node.ref), 1, None), "follower")
 
       node.expectMsg(maximalFollowerTimeout * 2, Raft.Out.VoteRequest(term = 2))
   }
@@ -144,7 +144,7 @@ class RaftTest
   }
 
   it should "vote for a legitimate new leader" in cluster { implicit ctx =>
-    val newLeader = TestProbe[Raft.Out.Message]("node")
+    val newLeader = TestProbe[Raft.Out.Message]("newLeader")
     val follower =
       ctx.spawn(newFollower(Set(newLeader.ref), 1, None), "follower")
 
@@ -155,7 +155,7 @@ class RaftTest
 
   it should "not vote for two different candidates during one term" in cluster {
     implicit ctx =>
-      val newLeader = TestProbe[Raft.Out.Message]("node")
+      val newLeader = TestProbe[Raft.Out.Message]("newLeader")
       val follower = ctx.spawn(
         newFollower(Set(newLeader.ref), 1, Some(ctx.system.deadLetters)),
         "follower")

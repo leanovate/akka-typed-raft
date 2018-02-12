@@ -51,7 +51,7 @@ object NodesView {
     (for {
       (node, i) <- nodes.zipWithIndex
       p = i.toDouble / nodes.size * 2 * math.Pi
-    } yield node -> (math.sin(p) * 40, math.cos(p) * 40)).toMap
+    } yield node -> ((math.sin(p) * 40, math.cos(p) * 40))).toMap
 
   def relativeTime(startTime: Double,
                    currentTime: Double,

@@ -4,14 +4,13 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.Materializer
 import upickle.default.write
 
 import scala.concurrent.duration._
 
-object VisWebSerice {
+object VisWebService {
 
-  def routes(implicit sys: ActorSystem, mat: Materializer): Route = {
+  def routes(implicit sys: ActorSystem): Route = {
     import akka.typed.scaladsl.adapter._
 
     val store = new MemoryStore[NetworkEvent]

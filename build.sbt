@@ -1,8 +1,16 @@
 version := "0.1"
 
-val scalaV = "2.12.4"
-
 scalaVersion in ThisBuild := "2.12.4"
+
+scalacOptions in ThisBuild ++= Seq(
+  "-unchecked",
+  "-deprecation",
+  "-Xfuture",
+  "-Yno-adapted-args",
+  "-Ywarn-dead-code",
+  "-Ywarn-numeric-widen",
+  "-Ywarn-unused"
+)
 
 val akkaVersion = "2.5.8"
 
