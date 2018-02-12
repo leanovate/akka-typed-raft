@@ -23,8 +23,10 @@ private[vis] class MemoryStore[E] {
     }
   }
 
-  @volatile
-  private var last = new AtomicReference(Promise[(Promise[_], E)]())
+  private val (first, last) = {
+    val firstPromise = Promise[(Promise[_], E)]
+    val ref = new AtomicReference(firstPromise)
 
-  private val first = last.get().future
+    (firstPromise.future, ref)
+  }
 }
