@@ -17,17 +17,19 @@ object Raft {
     Actor.withTimers { leader(currentTerm)(config, _) }
 
   private[raft] def startAsFollower(currentTerm: Int = 0,
-                                    votedFor: Option[ActorRef[Out.Message]] =
-                                      None)(
+                                    votedFor: Option[Ambassador] = None,
+                                    currentLeader: Option[Ambassador] = None)(
       implicit config: ClusterConfiguration): Behavior[In.PrivateMessage] =
-    Actor.withTimers { follower(currentTerm, votedFor)(config, _) }
+    Actor.withTimers {
+      follower(currentTerm, votedFor, currentLeader)(config, _)
+    }
 
   private[raft] def startAsCandidate(currentTerm: Int = 0)(
       implicit config: ClusterConfiguration): Behavior[In.PrivateMessage] =
     Actor.withTimers { candidate(currentTerm)(config, _) }
 
   case class ClusterConfiguration(
-      ambassadors: Set[ActorRef[Out.Message]],
+      ambassadors: Set[Ambassador],
       logger: ActorRef[String],
       leaderHeartbeat: FiniteDuration,
       followerTimeout: (FiniteDuration, FiniteDuration),
@@ -51,7 +53,7 @@ object Raft {
           case In.VoteRequest(newLeader, newTerm) if newTerm > currentTerm =>
             newLeader ! Out.VoteResponse(newTerm)
             timer.cancelAll()
-            follower(newTerm, Some(newLeader))
+            follower(newTerm, Some(newLeader), Some(newLeader))
           case In.VoteRequest(_, oldTerm) if oldTerm <= currentTerm =>
             Actor.same
           case _: In.VoteResponse =>
@@ -61,7 +63,8 @@ object Raft {
     }
 
   private def follower(currentTerm: Int,
-                       votedFor: Option[ActorRef[Out.Message]])(
+                       votedFor: Option[Ambassador],
+                       currentLeader: Option[Ambassador])(
       implicit config: ClusterConfiguration,
       timer: TimerScheduler[In.PrivateMessage]): Behavior[In.PrivateMessage] = {
     def resetTimer(): Unit = {
@@ -80,7 +83,7 @@ object Raft {
           case In.Message(oldTerm) if oldTerm < currentTerm =>
             Actor.same
           case In.Heartbeat(newTerm) if newTerm > currentTerm =>
-            follower(newTerm, None)
+            follower(newTerm, None, None)
           case In.Heartbeat(`currentTerm`) =>
             resetTimer()
             Actor.same
@@ -92,6 +95,9 @@ object Raft {
             candidate ! Out.VoteResponse(newTerm)
             Actor.same
           case In.VoteResponse(_) =>
+            Actor.same
+          case In.Command(respondTo) =>
+            respondTo ! Left(currentLeader.get)
             Actor.same
         }
       }
@@ -134,7 +140,7 @@ object Raft {
             candidate(currentTerm + 1)
           case In.Message(newTerm) if newTerm >= currentTerm =>
             timer.cancelAll()
-            follower(newTerm, None)
+            follower(newTerm, None, None)
           case In.Heartbeat(_) =>
             Actor.same
           case _: In.VoteRequest =>
@@ -156,6 +162,8 @@ object Raft {
   private[raft] def minimalMajority(clusterSize: Int): Int =
     clusterSize / 2 + 1
 
+  type Ambassador = ActorRef[Out.Message]
+
   object In {
     private[raft] sealed trait PrivateMessage
 
@@ -169,16 +177,20 @@ object Raft {
 
     case class Heartbeat(term: Int) extends Message
 
-    case class VoteRequest(candidate: ActorRef[Out.Message], term: Int)
-        extends Message
+    case class VoteRequest(candidate: Ambassador, term: Int) extends Message
 
     case class VoteResponse(term: Int) extends Message
 
-    private[raft] case object Timeout extends PrivateMessage
+    case class Command(
+        respondTo: ActorRef[Either[ActorRef[Raft.Out.Message], Unit]])
+        extends PrivateMessage
 
+    private[raft] case object Timeout extends PrivateMessage
     private[raft] val HeartbeatTick: Timeout.type = Timeout
     private[raft] val LeaderTimeout: Timeout.type = Timeout
+
     private[raft] val CandidateTimeout: Timeout.type = Timeout
+
   }
 
   object Out {
