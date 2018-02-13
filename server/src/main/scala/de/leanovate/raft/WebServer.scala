@@ -19,11 +19,8 @@ object WebServer extends Directives {
     val interface = config.getString("http.interface")
     val port = config.getInt("http.port")
 
-    val bindingFuture = Http().bindAndHandle(
-      VisWebSerice.routes ~ WebService.route,
-      interface,
-      port)
-
-    println(s"Server online at http://$interface:$port")
+    Http()
+      .bindAndHandle(VisWebService.routes ~ WebService.route, interface, port)
+      .foreach(_ => println(s"Server online at http://$interface:$port"))
   }
 }
