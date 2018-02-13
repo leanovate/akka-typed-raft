@@ -4,7 +4,7 @@ import akka.typed.scaladsl.ActorContext
 import akka.typed.testkit.scaladsl.TestProbe
 import akka.typed.{ActorRef, Behavior}
 import de.leanovate.raft.ClusterTest._
-import de.leanovate.raft.Raft.{ClusterConfiguration, In, Out}
+import de.leanovate.raft.Raft.{Ambassador, ClusterConfiguration, In, Out}
 import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
@@ -25,25 +25,28 @@ class RaftTest
     .ensuring(_ < minimalFollowerTimeout)
   private val shortTime: FiniteDuration = 10.milliseconds
 
-  def testConfiguration(nodes: Set[ActorRef[Out.Message]])(
-      implicit ctx: ActorContext[_]) =
+  def testConfiguration(nodes: Set[Ambassador])(implicit ctx: ActorContext[_]) =
     ClusterConfiguration(nodes,
                          ctx.system.deadLetters,
                          leaderHeartbeat,
                          followerTimeout,
                          candidateTimeout)
 
-  def newLeader(nodes: Set[ActorRef[Out.Message]], currentTerm: Int)(
+  def newLeader(nodes: Set[Ambassador], currentTerm: Int)(
       implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
     Raft.startAsLeader(currentTerm)(testConfiguration(nodes))
 
-  def newFollower(nodes: Set[ActorRef[Out.Message]],
+  def newFollower(nodes: Set[Ambassador],
                   currentTerm: Int,
-                  votedFor: Option[ActorRef[Out.Message]] = None)(
+                  votedFor: Option[Ambassador] = None,
+                  currentLeader: Option[Ambassador] = None)(
       implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
-    Raft.startAsFollower(currentTerm, votedFor)(testConfiguration(nodes))
+    Raft.startAsFollower(
+      currentTerm,
+      votedFor = votedFor,
+      currentLeader = currentLeader)(testConfiguration(nodes))
 
-  def newCandidate(nodes: Set[ActorRef[Out.Message]], currentTerm: Int)(
+  def newCandidate(nodes: Set[Ambassador], currentTerm: Int)(
       implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
     Raft.startAsCandidate(currentTerm)(testConfiguration(nodes))
 
@@ -179,6 +182,23 @@ class RaftTest
   ignore should "ignore all vote responses" in cluster { implicit ctx =>
     // how could this be tested?
     fail()
+  }
+
+  it should "respond with the current leader on commands" in cluster {
+    implicit ctx =>
+      val leader = TestProbe[Raft.Out.Message]("leader")
+
+      val follower =
+        ctx.spawn(
+          newFollower(Set(leader.ref), 1, currentLeader = Some(leader.ref)),
+          "follower")
+
+      val client = TestProbe[Either[ActorRef[Raft.Out.Message], Unit]]("client")
+
+      follower ! Raft.In.Heartbeat(1)
+      follower ! Raft.In.Command(client.ref)
+
+      client.expectMsg(Left(leader.ref))
   }
 
   "candidates" should "become leaders when receiving vote responses from the majority" in cluster {
