@@ -39,7 +39,7 @@ class RaftTest
 
   def newFollower(nodes: Set[ActorRef[Out.Message]],
                   currentTerm: Int,
-                  votedFor: Option[ActorRef[Out.Message]])(
+                  votedFor: Option[ActorRef[Out.Message]] = None)(
       implicit ctx: ActorContext[_]): Behavior[In.PrivateMessage] =
     Raft.startAsFollower(currentTerm, votedFor)(testConfiguration(nodes))
 
@@ -85,7 +85,7 @@ class RaftTest
   "followers" should "send vote request if a timeout happens" in cluster {
     implicit ctx =>
       val node = TestProbe[Raft.Out.Message]("node")
-      ctx.spawn(newFollower(Set(node.ref), 1, None), "follower")
+      ctx.spawn(newFollower(Set(node.ref), 1), "follower")
 
       node.expectMsg(maximalFollowerTimeout * 2, Raft.Out.VoteRequest(term = 2))
   }
@@ -105,7 +105,7 @@ class RaftTest
   it should "ignore heartbeats from previous leaders" in cluster {
     implicit ctx =>
       val node = TestProbe[Raft.Out.Message]("node")
-      val follower = ctx.spawn(newFollower(Set(node.ref), 1, None), "follower")
+      val follower = ctx.spawn(newFollower(Set(node.ref), 1), "follower")
 
       ctx.schedule(1 * leaderHeartbeat, follower, Raft.In.Heartbeat(0))
       ctx.schedule(2 * leaderHeartbeat, follower, Raft.In.Heartbeat(0))
@@ -118,7 +118,7 @@ class RaftTest
     implicit ctx =>
       val otherNode = TestProbe[Raft.Out.Message]("node")
       val follower =
-        ctx.spawn(newFollower(Set(otherNode.ref), 1, None), "follower")
+        ctx.spawn(newFollower(Set(otherNode.ref), 1), "follower")
 
       follower ! Raft.In.Heartbeat(term = 3)
 
@@ -130,7 +130,7 @@ class RaftTest
     implicit ctx =>
       val otherNode = TestProbe[Raft.Out.Message]("node")
       val follower =
-        ctx.spawn(newFollower(Set(otherNode.ref), 1, None), "follower")
+        ctx.spawn(newFollower(Set(otherNode.ref), 1), "follower")
 
       follower ! Raft.In.Heartbeat(term = 3)
 
@@ -146,7 +146,7 @@ class RaftTest
   it should "vote for a legitimate new leader" in cluster { implicit ctx =>
     val newLeader = TestProbe[Raft.Out.Message]("newLeader")
     val follower =
-      ctx.spawn(newFollower(Set(newLeader.ref), 1, None), "follower")
+      ctx.spawn(newFollower(Set(newLeader.ref), 1), "follower")
 
     follower ! Raft.In.VoteRequest(newLeader.ref, term = 2)
 
@@ -169,7 +169,7 @@ class RaftTest
     implicit ctx =>
       val newLeaderProbe = TestProbe[Raft.Out.Message]("newLeader")
       val follower =
-        ctx.spawn(newFollower(Set(newLeaderProbe.ref), 2, None), "follower")
+        ctx.spawn(newFollower(Set(newLeaderProbe.ref), 2), "follower")
 
       follower ! Raft.In.VoteRequest(newLeaderProbe.ref, term = 1)
 
