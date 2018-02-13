@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives
 import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.ConfigFactory
-import de.leanovate.raft.vis.VisWebSerice
+import de.leanovate.raft.vis.VisWebService
 
 import scala.concurrent.ExecutionContext
 
