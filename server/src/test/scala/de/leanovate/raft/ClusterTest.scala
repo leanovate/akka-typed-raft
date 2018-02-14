@@ -2,9 +2,10 @@ package de.leanovate.raft
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.typed.ActorSystem
+import akka.typed.{ActorRef, ActorSystem, Behavior}
 import akka.typed.scaladsl.{Actor, ActorContext}
 import akka.typed.testkit.TestKitSettings
+import akka.typed.testkit.scaladsl.TestProbe
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -37,4 +38,13 @@ object ClusterTest {
 
     res.get().foreach(throw _)
   }
+
+  def spawn[U](behavior: Behavior[U])(implicit name: sourcecode.Name,
+                                      ctx: ActorContext[_]): ActorRef[U] =
+    ctx.spawn(behavior, name.value)
+
+  def Probe[U](implicit name: sourcecode.Name,
+               system: ActorSystem[_],
+               settings: TestKitSettings): TestProbe[U] =
+    TestProbe[U](name.value)
 }

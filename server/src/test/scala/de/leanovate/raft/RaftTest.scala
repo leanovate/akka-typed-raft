@@ -51,9 +51,8 @@ class RaftTest
     Raft.startAsCandidate(currentTerm)(testConfiguration(nodes))
 
   "leaders" should "send heartbeats regularly" in cluster { implicit ctx =>
-    val follower = TestProbe[Out.Message]("follower")
-    val leader =
-      ctx.spawn(newLeader(Set(follower.ref), currentTerm = 1), "leader")
+    val follower = Probe[Out.Message]
+    val leader = spawn(newLeader(Set(follower.ref), currentTerm = 1))
 
     leader ! Raft.In.HeartbeatTick
 
@@ -61,9 +60,8 @@ class RaftTest
   }
 
   it should "vote for a new legitimate new leader" in cluster { implicit ctx =>
-    val newCandidate = TestProbe[Raft.Out.Message]("node")
-    val oldLeader =
-      ctx.spawn(newLeader(Set(newCandidate.ref), currentTerm = 1), "oldLeader")
+    val newCandidate = Probe[Raft.Out.Message]
+    val oldLeader = spawn(newLeader(Set(newCandidate.ref), currentTerm = 1))
 
     oldLeader ! Raft.In.VoteRequest(newCandidate.ref, term = 2)
 
@@ -72,9 +70,8 @@ class RaftTest
 
   it should "ignore vote request for the current and older terms" in cluster {
     implicit ctx =>
-      val oldCandidate = TestProbe[Raft.Out.Message]("oldCandidate")
-      val leader =
-        ctx.spawn(newLeader(Set(oldCandidate.ref), currentTerm = 2), "leader")
+      val oldCandidate = Probe[Raft.Out.Message]
+      val leader = spawn(newLeader(Set(oldCandidate.ref), currentTerm = 2))
 
       leader ! Raft.In.VoteRequest(oldCandidate.ref, term = 2)
       oldCandidate.expectNoMsg(shortTime)
@@ -87,7 +84,7 @@ class RaftTest
 
   "followers" should "send vote request if a timeout happens" in cluster {
     implicit ctx =>
-      val node = TestProbe[Raft.Out.Message]("node")
+      val node = Probe[Raft.Out.Message]
       ctx.spawn(newFollower(Set(node.ref), 1), "follower")
 
       node.expectMsg(maximalFollowerTimeout * 2, Raft.Out.VoteRequest(term = 2))
@@ -107,8 +104,8 @@ class RaftTest
 
   it should "ignore heartbeats from previous leaders" in cluster {
     implicit ctx =>
-      val node = TestProbe[Raft.Out.Message]("node")
-      val follower = ctx.spawn(newFollower(Set(node.ref), 1), "follower")
+      val node = Probe[Raft.Out.Message]
+      val follower = spawn(newFollower(Set(node.ref), 1))
 
       ctx.schedule(1 * leaderHeartbeat, follower, Raft.In.Heartbeat(0))
       ctx.schedule(2 * leaderHeartbeat, follower, Raft.In.Heartbeat(0))
@@ -119,9 +116,8 @@ class RaftTest
 
   it should "update its term when receiving a heartbeat with newer term number" in cluster {
     implicit ctx =>
-      val otherNode = TestProbe[Raft.Out.Message]("node")
-      val follower =
-        ctx.spawn(newFollower(Set(otherNode.ref), 1), "follower")
+      val otherNode = Probe[Raft.Out.Message]
+      val follower = spawn(newFollower(Set(otherNode.ref), 1))
 
       follower ! Raft.In.Heartbeat(term = 3)
 
@@ -131,9 +127,8 @@ class RaftTest
 
   it should "restart its timer after being a candidate and reverting back to follower" in cluster {
     implicit ctx =>
-      val otherNode = TestProbe[Raft.Out.Message]("node")
-      val follower =
-        ctx.spawn(newFollower(Set(otherNode.ref), 1), "follower")
+      val otherNode = Probe[Raft.Out.Message]
+      val follower = spawn(newFollower(Set(otherNode.ref), 1))
 
       follower ! Raft.In.Heartbeat(term = 3)
 
@@ -147,9 +142,8 @@ class RaftTest
   }
 
   it should "vote for a legitimate new leader" in cluster { implicit ctx =>
-    val newLeader = TestProbe[Raft.Out.Message]("newLeader")
-    val follower =
-      ctx.spawn(newFollower(Set(newLeader.ref), 1), "follower")
+    val newLeader = Probe[Raft.Out.Message]
+    val follower = spawn(newFollower(Set(newLeader.ref), 1))
 
     follower ! Raft.In.VoteRequest(newLeader.ref, term = 2)
 
@@ -158,10 +152,9 @@ class RaftTest
 
   it should "not vote for two different candidates during one term" in cluster {
     implicit ctx =>
-      val newLeader = TestProbe[Raft.Out.Message]("newLeader")
-      val follower = ctx.spawn(
-        newFollower(Set(newLeader.ref), 1, Some(ctx.system.deadLetters)),
-        "follower")
+      val newLeader = Probe[Raft.Out.Message]
+      val follower =
+        spawn(newFollower(Set(newLeader.ref), 1, Some(ctx.system.deadLetters)))
 
       follower ! Raft.In.VoteRequest(newLeader.ref, term = 1)
 
@@ -170,9 +163,8 @@ class RaftTest
 
   it should "not respond to vote requests from old terms" in cluster {
     implicit ctx =>
-      val newLeaderProbe = TestProbe[Raft.Out.Message]("newLeader")
-      val follower =
-        ctx.spawn(newFollower(Set(newLeaderProbe.ref), 2), "follower")
+      val newLeaderProbe = Probe[Raft.Out.Message]
+      val follower = spawn(newFollower(Set(newLeaderProbe.ref), 2))
 
       follower ! Raft.In.VoteRequest(newLeaderProbe.ref, term = 1)
 
@@ -186,14 +178,12 @@ class RaftTest
 
   it should "respond with the current leader on commands" in cluster {
     implicit ctx =>
-      val leader = TestProbe[Raft.Out.Message]("leader")
+      val leader = Probe[Raft.Out.Message]
 
       val follower =
-        ctx.spawn(
-          newFollower(Set(leader.ref), 1, currentLeader = Some(leader.ref)),
-          "follower")
+        spawn(newFollower(Set(leader.ref), 1, currentLeader = Some(leader.ref)))
 
-      val client = TestProbe[Either[ActorRef[Raft.Out.Message], Unit]]("client")
+      val client = Probe[Either[ActorRef[Raft.Out.Message], Unit]]
 
       follower ! Raft.In.Heartbeat(1)
       follower ! Raft.In.Command(client.ref)
@@ -205,7 +195,7 @@ class RaftTest
     implicit ctx =>
       val follower = fiveProbes
       val followerActors = follower.map(_.ref)
-      val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
+      val candidate = spawn(newCandidate(followerActors, 2))
 
       followerActors.foreach { _ =>
         candidate ! Raft.In.VoteResponse(2)
@@ -221,7 +211,7 @@ class RaftTest
     implicit ctx =>
       val follower = fiveProbes
       val followerActors = follower.map(_.ref)
-      val candidate = ctx.spawn(newCandidate(followerActors, 4), "candidate")
+      val candidate = spawn(newCandidate(followerActors, 4))
 
       candidate ! Raft.In.VoteResponse(1)
       candidate ! Raft.In.VoteResponse(2)
@@ -242,7 +232,7 @@ class RaftTest
     implicit ctx =>
       val follower = fiveProbes
       val followerActors = follower.map(_.ref)
-      val candidate = ctx.spawn(newCandidate(followerActors, 4), "candidate")
+      val candidate = spawn(newCandidate(followerActors, 4))
 
       candidate ! Raft.In.VoteResponse(2)
 
@@ -254,8 +244,8 @@ class RaftTest
 
   it should "become a follower if a heartbeat is received" in cluster {
     implicit ctx =>
-      val follower = TestProbe[Raft.Out.Message]("node")
-      val candidate = ctx.spawn(newCandidate(Set(follower.ref), 2), "candidate")
+      val follower = Probe[Raft.Out.Message]
+      val candidate = spawn(newCandidate(Set(follower.ref), 2))
 
       candidate ! Raft.In.Heartbeat(2)
 
@@ -267,10 +257,10 @@ class RaftTest
 
   it should "become a follower if a vote request with a more recent term is received" in cluster {
     implicit ctx =>
-      val newLeader = TestProbe[Raft.Out.Message]("newLeader")
+      val newLeader = Probe[Raft.Out.Message]
       val follower = fiveProbes
       val followerActors = follower.map(_.ref)
-      val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
+      val candidate = spawn(newCandidate(followerActors, 2))
 
       follower.foreach {
         _.expectMsg(Raft.Out.VoteRequest(term = 2))
@@ -286,7 +276,7 @@ class RaftTest
   it should "ignore old heartbeats" in cluster { implicit ctx =>
     val follower = fiveProbes
     val followerActors = follower.map(_.ref)
-    val candidate = ctx.spawn(newCandidate(followerActors, 2), "candidate")
+    val candidate = spawn(newCandidate(followerActors, 2))
 
     candidate ! Raft.In.Heartbeat(1)
 
@@ -315,8 +305,8 @@ class RaftTest
   }
 
   private def fiveProbes(implicit ctx: ActorContext[_]) =
-    (1 to 4 map { _ =>
-      TestProbe[Raft.Out.Message]("node")
+    (1 to 4 map { i =>
+      TestProbe[Raft.Out.Message]("node" ++ i.toString)
     }).toSet
 
 }
