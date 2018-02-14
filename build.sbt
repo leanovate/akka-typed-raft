@@ -29,7 +29,8 @@ lazy val server = (project in file("server")).settings(
     "com.vmunier" %% "scalajs-scripts" % "1.1.1",
     "com.typesafe.akka" %% "akka-stream" % akkaVersion,
     "org.scalatest" %% "scalatest" % "3.0.5" % Test,
-    "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
+    "org.scalacheck" %% "scalacheck" % "1.13.5" % Test,
+    "com.lihaoyi" %% "sourcecode" % "0.1.4" % Test
   ),
   WebKeys.packagePrefix in Assets := "public/",
   managedClasspath in Runtime += (packageBin in Assets).value,
