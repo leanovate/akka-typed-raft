@@ -4,12 +4,11 @@ import org.scalajs.dom
 import org.scalajs.dom._
 import upickle.default.read
 
-import scala.scalajs.js.JSApp
 import scala.scalajs.js.annotation.JSExportTopLevel
 import scalatags.JsDom.all._
 
 @JSExportTopLevel("App")
-object App extends JSApp {
+object App {
   // create a view for the counter
   val messages =
     new MessageView(AppCircuit.zoom(_.networkEvents))
@@ -30,8 +29,7 @@ object App extends JSApp {
     AppCircuit.zoom(_.selected),
     AppCircuit.zoom(rm => onlyLastState(rm.networkEvents)))
 
-  @JSExportTopLevel("App.main")
-  override def main(): Unit = {
+  def main(args: Array[String]): Unit = {
 
     val root = document.getElementById("root")
     // subscribe to changes in the application model and call render when anything changes
