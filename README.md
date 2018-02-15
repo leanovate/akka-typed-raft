@@ -1,4 +1,4 @@
-# A Raft implementation using akka-typed [![Gitter](https://img.shields.io/gitter/room/leanovate-akka-typed-raft/Lobby.svg)](https://gitter.im/leanovate-akka-typed-raft/Lobby)
+# A Raft implementation using akka-typed [![Gitter](https://img.shields.io/gitter/room/leanovate-akka-typed-raft/Lobby.svg)](https://gitter.im/leanovate-akka-typed-raft/Lobby) [![Build Status](https://travis-ci.org/leanovate/akka-typed-raft.svg?branch=master)](https://travis-ci.org/leanovate/akka-typed-raft)
 
 For good explanation of Raft see: 
 * https://raft.github.io/raft.pdf
@@ -15,13 +15,13 @@ After each source code change the server and the client will reload. (This featu
 sbt ~reStart
 ```
 
-To run all tests use
+Notice that sbt starts in the server project, to test server and client code use
 
 ```bash
-sbt test
+sbt server/test client/test
 ```
 
-### Anatomy the application
+### Anatomy of the application
 
 The folder `server` contains the Raft algorithm it self written with [Akka-Typed](https://doc.akka.io/docs/akka/current/actors-typed.html#introduction) and a [Akka-HTTP](https://doc.akka.io/docs/akka-http/current/introduction.html#routing-dsl-for-http-servers) web-server to observe the running algorithm (in package `vis`).
 
