@@ -84,7 +84,7 @@ object MonitoredNetwork {
 
   private def outToInMessage(ambassador: ActorRef[Raft.Out.Message])
     : Raft.Out.Message => Raft.In.Message = {
-    case Raft.Out.Heartbeat(term)    => Raft.In.Heartbeat(term)
+    case Raft.Out.Heartbeat(term)    => Raft.In.Heartbeat(ambassador, term)
     case Raft.Out.VoteRequest(term)  => Raft.In.VoteRequest(ambassador, term)
     case Raft.Out.VoteResponse(term) => Raft.In.VoteResponse(term)
   }

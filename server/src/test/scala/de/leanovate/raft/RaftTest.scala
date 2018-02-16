@@ -104,22 +104,30 @@ class RaftTest
 
   it should "ignore heartbeats from previous leaders" in cluster {
     implicit ctx =>
-      val node = Probe[Raft.Out.Message]
-      val follower = spawn(newFollower(Set(node.ref), 1))
+      val oldLeader = Probe[Out.Message]
+      val follower = spawn(newFollower(Set(oldLeader.ref), 1))
 
-      ctx.schedule(1 * leaderHeartbeat, follower, Raft.In.Heartbeat(0))
-      ctx.schedule(2 * leaderHeartbeat, follower, Raft.In.Heartbeat(0))
-      ctx.schedule(3 * leaderHeartbeat, follower, Raft.In.Heartbeat(0))
+      ctx.schedule(1 * leaderHeartbeat,
+                   follower,
+                   Raft.In.Heartbeat(oldLeader.ref, 0))
+      ctx.schedule(2 * leaderHeartbeat,
+                   follower,
+                   Raft.In.Heartbeat(oldLeader.ref, 0))
+      ctx.schedule(3 * leaderHeartbeat,
+                   follower,
+                   Raft.In.Heartbeat(oldLeader.ref, 0))
 
-      node.expectMsg(maximalFollowerTimeout * 2, Raft.Out.VoteRequest(term = 2))
+      oldLeader.expectMsg(maximalFollowerTimeout * 2,
+                          Raft.Out.VoteRequest(term = 2))
   }
 
   it should "update its term when receiving a heartbeat with newer term number" in cluster {
     implicit ctx =>
       val otherNode = Probe[Raft.Out.Message]
+      val newLeader = Probe[Raft.Out.Message]
       val follower = spawn(newFollower(Set(otherNode.ref), 1))
 
-      follower ! Raft.In.Heartbeat(term = 3)
+      follower ! Raft.In.Heartbeat(newLeader.ref, term = 3)
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
                           Raft.Out.VoteRequest(term = 4))
@@ -128,14 +136,15 @@ class RaftTest
   it should "restart its timer after being a candidate and reverting back to follower" in cluster {
     implicit ctx =>
       val otherNode = Probe[Raft.Out.Message]
+      val sporadicLeader = Probe[Raft.Out.Message]
       val follower = spawn(newFollower(Set(otherNode.ref), 1))
 
-      follower ! Raft.In.Heartbeat(term = 3)
+      follower ! Raft.In.Heartbeat(sporadicLeader.ref, term = 3)
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
                           Raft.Out.VoteRequest(term = 4))
 
-      follower ! Raft.In.Heartbeat(term = 5)
+      follower ! Raft.In.Heartbeat(sporadicLeader.ref, term = 5)
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
                           Raft.Out.VoteRequest(term = 6))
@@ -185,7 +194,7 @@ class RaftTest
 
       val client = Probe[Either[ActorRef[Raft.Out.Message], Unit]]
 
-      follower ! Raft.In.Heartbeat(1)
+      follower ! Raft.In.Heartbeat(leader.ref, 1)
       follower ! Raft.In.Command(client.ref)
 
       client.expectMsg(Left(leader.ref))
@@ -247,7 +256,7 @@ class RaftTest
       val follower = Probe[Raft.Out.Message]
       val candidate = spawn(newCandidate(Set(follower.ref), 2))
 
-      candidate ! Raft.In.Heartbeat(2)
+      candidate ! Raft.In.Heartbeat(follower.ref, 2)
 
       follower.expectMsg(Raft.Out.VoteRequest(term = 2))
 
@@ -278,7 +287,7 @@ class RaftTest
     val followerActors = follower.map(_.ref)
     val candidate = spawn(newCandidate(followerActors, 2))
 
-    candidate ! Raft.In.Heartbeat(1)
+    candidate ! Raft.In.Heartbeat(followerActors.head, 1)
 
     follower.foreach { f =>
       f.expectMsg(Raft.Out.VoteRequest(term = 2))

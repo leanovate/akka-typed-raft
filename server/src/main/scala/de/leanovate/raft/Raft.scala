@@ -82,11 +82,8 @@ object Raft {
             candidate(currentTerm + 1)
           case In.Message(oldTerm) if oldTerm < currentTerm =>
             Actor.same
-          case In.Heartbeat(newTerm) if newTerm > currentTerm =>
-            follower(newTerm, None, None)
-          case In.Heartbeat(`currentTerm`) =>
-            resetTimer()
-            Actor.same
+          case In.Heartbeat(newLeader, newTerm) if newTerm >= currentTerm =>
+            follower(newTerm, None, Some(newLeader))
           case In.VoteRequest(candidate, `currentTerm`)
               if votedFor != Some(candidate) =>
             Actor.same
@@ -138,10 +135,13 @@ object Raft {
           case In.CandidateTimeout =>
             config.logger ! "candidate timeout, start new term"
             candidate(currentTerm + 1)
+          case In.Heartbeat(leader, newTerm) if newTerm >= currentTerm =>
+            timer.cancelAll()
+            follower(newTerm, None, Some(leader))
           case In.Message(newTerm) if newTerm >= currentTerm =>
             timer.cancelAll()
             follower(newTerm, None, None)
-          case In.Heartbeat(_) =>
+          case _: In.Heartbeat =>
             Actor.same
           case _: In.VoteRequest =>
             Actor.same
@@ -175,7 +175,7 @@ object Raft {
       def unapply(arg: Message): Option[Int] = Some(arg.term)
     }
 
-    case class Heartbeat(term: Int) extends Message
+    case class Heartbeat(leader: Ambassador, term: Int) extends Message
 
     case class VoteRequest(candidate: Ambassador, term: Int) extends Message
 
