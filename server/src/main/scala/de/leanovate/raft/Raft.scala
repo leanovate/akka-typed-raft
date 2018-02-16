@@ -43,7 +43,7 @@ object Raft {
       implicit config: ClusterConfiguration,
       timer: TimerScheduler[In.PrivateMessage]): Behavior[In.PrivateMessage] =
     Actor.deferred { ctx =>
-      config.logger ! "became leader"
+      config.logger ! s"became leader in tem $currentTerm"
       timer.startPeriodicTimer("", In.HeartbeatTick, config.leaderHeartbeat)
       Actor.immutable { (_, msg) =>
         msg match {

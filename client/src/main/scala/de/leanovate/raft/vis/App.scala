@@ -9,9 +9,7 @@ import scalatags.JsDom.all._
 
 @JSExportTopLevel("App")
 object App {
-  // create a view for the counter
-  val messages =
-    new MessageView(AppCircuit.zoom(_.networkEvents))
+  val messages = new MessageView(AppCircuit.zoom(_.networkEvents))
   val nodes = new NodesView(AppCircuit.zoom(_.currentTime),
                             AppCircuit.zoom(_.knowNodes),
                             AppCircuit.zoom(_.networkEvents),
