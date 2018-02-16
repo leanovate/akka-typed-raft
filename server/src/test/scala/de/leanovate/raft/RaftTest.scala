@@ -295,6 +295,18 @@ class RaftTest
     }
   }
 
+  it should "stash commands until being follower" in cluster { implicit ctx =>
+    val upcomingLeader = Probe[Out.Message]
+    val candidate = spawn(newCandidate(Set(upcomingLeader.ref), 1))
+    val client = Probe[Either[ActorRef[Out.Message], Unit]]
+
+    candidate ! In.Command(client.ref)
+
+    candidate ! In.Heartbeat(upcomingLeader.ref, 1)
+
+    client.expectMsg(Left(upcomingLeader.ref))
+  }
+
   "minimal majority" should "be greater than the total opposition" in {
     forAll(Gen.posNum[Int]) { clusterSize =>
       val majority = Raft.minimalMajority(clusterSize)

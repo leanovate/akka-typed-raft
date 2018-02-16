@@ -113,21 +113,27 @@ object Raft {
     }
   }
 
-  private def candidate(currentTerm: Int)(
+  /**
+    * @param stashed commands which require a leader and are stashed until a new leader is known
+    */
+  private def candidate(currentTerm: Int, stashed: Seq[In.Command] = Seq.empty)(
       implicit config: ClusterConfiguration,
       timer: TimerScheduler[In.PrivateMessage]): Behavior[In.PrivateMessage] = {
     timer.startSingleTimer("", In.CandidateTimeout, config.candidateTimeout)
 
-    def waitingCandidate(requiredVotes: Int): Behavior[In.PrivateMessage] =
+    def waitingCandidate(
+        requiredVotes: Int,
+        stashed: Seq[In.Command]): Behavior[In.PrivateMessage] =
       Actor.immutable { (ctx, msg) =>
         msg match {
           case In.VoteResponse(`currentTerm`) =>
             val openVotes = requiredVotes - 1
             if (openVotes == 0) {
               ctx.self ! In.HeartbeatTick
+              stashed.foreach(ctx.self ! _)
               leader(currentTerm)
             } else {
-              waitingCandidate(openVotes)
+              waitingCandidate(openVotes, stashed)
             }
 
           case In.VoteResponse(_) =>
@@ -137,6 +143,7 @@ object Raft {
             candidate(currentTerm + 1)
           case In.Heartbeat(leader, newTerm) if newTerm >= currentTerm =>
             timer.cancelAll()
+            stashed.foreach(ctx.self ! _)
             follower(newTerm, None, Some(leader))
           case In.Message(newTerm) if newTerm >= currentTerm =>
             timer.cancelAll()
@@ -145,6 +152,8 @@ object Raft {
             Actor.same
           case _: In.VoteRequest =>
             Actor.same
+          case c: In.Command =>
+            candidate(currentTerm, stashed :+ c)
         }
       }
 
@@ -155,7 +164,7 @@ object Raft {
       val requiredConfirmations: Int =
         minimalMajority(config.ambassadors.size + 1) - 1 /* one self vote */
 
-      waitingCandidate(requiredConfirmations)
+      waitingCandidate(requiredConfirmations, stashed)
     }
   }
 
