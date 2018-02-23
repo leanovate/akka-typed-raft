@@ -52,15 +52,15 @@ object MonitoredNetwork {
         case (_, DelayedNetworkMessage(msg, from, to)) =>
           nodes(to) ! outToInMessage(ambassadorFor(to -> from))(msg)
           Actor.same
-        case (ctx, NetworkMessage(msg, from, to)) =>
+        case (actorContext, NetworkMessage(msg, from, to)) =>
           sink(
             MessageSent(from,
                         to,
                         time(),
                         time() + slowMessages.toMillis.toDouble / 1000.0,
                         Map("c" -> msg.toString)))
-          ctx.schedule(slowMessages,
-                       ctx.self,
+          actorContext.schedule(slowMessages,
+                       actorContext.self,
                        DelayedNetworkMessage(msg, from, to))
           Actor.same
         case (_, NodeLogMessage(node, msg)) =>
@@ -84,7 +84,7 @@ object MonitoredNetwork {
 
   private def outToInMessage(ambassador: ActorRef[Raft.Out.Message])
     : Raft.Out.Message => Raft.In.Message = {
-    case Raft.Out.Heartbeat(term)    => Raft.In.Heartbeat(ambassador, term)
+    case Raft.Out.Heartbeat(term, appendEntriesCommand) => Raft.In.Heartbeat(ambassador, term, appendEntriesCommand)
     case Raft.Out.VoteRequest(term)  => Raft.In.VoteRequest(ambassador, term)
     case Raft.Out.VoteResponse(term) => Raft.In.VoteResponse(term)
   }

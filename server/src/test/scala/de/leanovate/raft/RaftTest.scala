@@ -4,7 +4,7 @@ import akka.typed.scaladsl.ActorContext
 import akka.typed.testkit.scaladsl.TestProbe
 import akka.typed.{ActorRef, Behavior}
 import de.leanovate.raft.ClusterTest._
-import de.leanovate.raft.Raft.{Ambassador, ClusterConfiguration, In, Out}
+import de.leanovate.raft.Raft._
 import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
@@ -56,7 +56,7 @@ class RaftTest
 
     leader ! Raft.In.HeartbeatTick
 
-    follower.expectMsg(Raft.Out.Heartbeat(1))
+    follower.expectMsg(Raft.Out.Heartbeat(1, AppendEntriesCommand()))
   }
 
   it should "vote for a new legitimate new leader" in cluster { implicit ctx =>
@@ -79,7 +79,7 @@ class RaftTest
       leader ! Raft.In.VoteRequest(oldCandidate.ref, term = 1)
       oldCandidate.expectNoMsg(shortTime)
 
-      oldCandidate.expectMsg(Raft.Out.Heartbeat(term = 2))
+      oldCandidate.expectMsg(Raft.Out.Heartbeat(term = 2, AppendEntriesCommand()))
   }
 
   "followers" should "send vote request if a timeout happens" in cluster {
@@ -109,13 +109,13 @@ class RaftTest
 
       ctx.schedule(1 * leaderHeartbeat,
                    follower,
-                   Raft.In.Heartbeat(oldLeader.ref, 0))
+                   Raft.In.Heartbeat(oldLeader.ref, 0, AppendEntriesCommand()))
       ctx.schedule(2 * leaderHeartbeat,
                    follower,
-                   Raft.In.Heartbeat(oldLeader.ref, 0))
+                   Raft.In.Heartbeat(oldLeader.ref, 0, AppendEntriesCommand()))
       ctx.schedule(3 * leaderHeartbeat,
                    follower,
-                   Raft.In.Heartbeat(oldLeader.ref, 0))
+                   Raft.In.Heartbeat(oldLeader.ref, 0, AppendEntriesCommand()))
 
       oldLeader.expectMsg(maximalFollowerTimeout * 2,
                           Raft.Out.VoteRequest(term = 2))
@@ -127,7 +127,7 @@ class RaftTest
       val newLeader = Probe[Raft.Out.Message]
       val follower = spawn(newFollower(Set(otherNode.ref), 1))
 
-      follower ! Raft.In.Heartbeat(newLeader.ref, term = 3)
+      follower ! Raft.In.Heartbeat(newLeader.ref, term = 3, AppendEntriesCommand())
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
                           Raft.Out.VoteRequest(term = 4))
@@ -139,12 +139,12 @@ class RaftTest
       val sporadicLeader = Probe[Raft.Out.Message]
       val follower = spawn(newFollower(Set(otherNode.ref), 1))
 
-      follower ! Raft.In.Heartbeat(sporadicLeader.ref, term = 3)
+      follower ! Raft.In.Heartbeat(sporadicLeader.ref, term = 3, AppendEntriesCommand())
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
                           Raft.Out.VoteRequest(term = 4))
 
-      follower ! Raft.In.Heartbeat(sporadicLeader.ref, term = 5)
+      follower ! Raft.In.Heartbeat(sporadicLeader.ref, term = 5, AppendEntriesCommand())
 
       otherNode.expectMsg(maximalFollowerTimeout * 2,
                           Raft.Out.VoteRequest(term = 6))
@@ -194,7 +194,7 @@ class RaftTest
 
       val client = Probe[Either[ActorRef[Raft.Out.Message], Unit]]
 
-      follower ! Raft.In.Heartbeat(leader.ref, 1)
+      follower ! Raft.In.Heartbeat(leader.ref, 1, AppendEntriesCommand())
       follower ! Raft.In.Command(client.ref)
 
       client.expectMsg(Left(leader.ref))
@@ -212,7 +212,7 @@ class RaftTest
 
       follower.foreach { f =>
         f.expectMsg(Raft.Out.VoteRequest(term = 2))
-        f.expectMsg(Raft.Out.Heartbeat(2))
+        f.expectMsg(Raft.Out.Heartbeat(2, AppendEntriesCommand()))
       }
   }
 
@@ -256,7 +256,7 @@ class RaftTest
       val follower = Probe[Raft.Out.Message]
       val candidate = spawn(newCandidate(Set(follower.ref), 2))
 
-      candidate ! Raft.In.Heartbeat(follower.ref, 2)
+      candidate ! Raft.In.Heartbeat(follower.ref, 2, AppendEntriesCommand())
 
       follower.expectMsg(Raft.Out.VoteRequest(term = 2))
 
@@ -287,7 +287,7 @@ class RaftTest
     val followerActors = follower.map(_.ref)
     val candidate = spawn(newCandidate(followerActors, 2))
 
-    candidate ! Raft.In.Heartbeat(followerActors.head, 1)
+    candidate ! Raft.In.Heartbeat(followerActors.head, 1, AppendEntriesCommand())
 
     follower.foreach { f =>
       f.expectMsg(Raft.Out.VoteRequest(term = 2))
@@ -302,7 +302,7 @@ class RaftTest
 
     candidate ! In.Command(client.ref)
 
-    candidate ! In.Heartbeat(upcomingLeader.ref, 1)
+    candidate ! In.Heartbeat(upcomingLeader.ref, 1, AppendEntriesCommand())
 
     client.expectMsg(Left(upcomingLeader.ref))
   }

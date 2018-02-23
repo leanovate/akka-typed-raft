@@ -48,7 +48,7 @@ object Raft {
       Actor.immutable { (_, msg) =>
         msg match {
           case In.HeartbeatTick =>
-            config.ambassadors.foreach(_ ! Out.Heartbeat(currentTerm))
+            config.ambassadors.foreach(_ ! Out.Heartbeat(currentTerm, Raft.AppendEntriesCommand()))
             Actor.same
           case In.VoteRequest(newLeader, newTerm) if newTerm > currentTerm =>
             newLeader ! Out.VoteResponse(newTerm)
@@ -82,10 +82,10 @@ object Raft {
             candidate(currentTerm + 1)
           case In.Message(oldTerm) if oldTerm < currentTerm =>
             Actor.same
-          case In.Heartbeat(newLeader, newTerm) if newTerm >= currentTerm =>
+          case In.Heartbeat(newLeader, newTerm, _) if newTerm >= currentTerm =>
             follower(newTerm, None, Some(newLeader))
           case In.VoteRequest(candidate, `currentTerm`)
-              if votedFor != Some(candidate) =>
+              if !votedFor.contains(candidate) =>
             Actor.same
           case In.VoteRequest(candidate, newTerm) if newTerm >= currentTerm =>
             resetTimer()
@@ -141,7 +141,7 @@ object Raft {
           case In.CandidateTimeout =>
             config.logger ! "candidate timeout, start new term"
             candidate(currentTerm + 1)
-          case In.Heartbeat(leader, newTerm) if newTerm >= currentTerm =>
+          case In.Heartbeat(leader, newTerm, _) if newTerm >= currentTerm =>
             timer.cancelAll()
             stashed.foreach(ctx.self ! _)
             follower(newTerm, None, Some(leader))
@@ -173,6 +173,11 @@ object Raft {
 
   type Ambassador = ActorRef[Out.Message]
 
+
+  case class AppendEntriesCommand(prevLogIndex: Int = 0, prevLogTerm: Int = 0, entries: Seq[LogEntry] = Seq.empty, leaderCommit: Int = 0)
+
+  case class LogEntry(data: Any)
+
   object In {
     private[raft] sealed trait PrivateMessage
 
@@ -184,7 +189,7 @@ object Raft {
       def unapply(arg: Message): Option[Int] = Some(arg.term)
     }
 
-    case class Heartbeat(leader: Ambassador, term: Int) extends Message
+    case class Heartbeat(leader: Ambassador, term: Int, appendEntriesCommand: AppendEntriesCommand) extends Message
 
     case class VoteRequest(candidate: Ambassador, term: Int) extends Message
 
@@ -199,7 +204,6 @@ object Raft {
     private[raft] val LeaderTimeout: Timeout.type = Timeout
 
     private[raft] val CandidateTimeout: Timeout.type = Timeout
-
   }
 
   object Out {
@@ -213,7 +217,7 @@ object Raft {
       def unapply(arg: TermMessage): Option[Int] = Some(arg.term)
     }
 
-    case class Heartbeat(term: Int) extends TermMessage
+    case class Heartbeat(term: Int, appendEntriesCommand: AppendEntriesCommand) extends TermMessage
 
     case class VoteRequest(term: Int) extends TermMessage
 
